@@ -155,16 +155,14 @@ def generate_summary_text(dct: dict) -> str:
 
     output_list.append("Non regulars")
     for i, tp in enumerate(dct["non_regulars"]):
-      # print(generate_status_string(tp["status"], tp["name"], i+1))
       output_list.append(generate_status_string(AttendanceStatus(tp["status"]), tp["name"], i+1))
 
     output_list.append("")
 
     output_list.append("Regulars")
     for i, tp in enumerate(dct["regulars"]):
-      # print(tp)
       output_list.append(generate_status_string(AttendanceStatus(tp["status"]), tp["name"], i+1))
-    # print(output_list)
+
     return "\n".join(output_list)
 
 async def gender(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -319,11 +317,9 @@ def main() -> None:
     )
 
     application.add_handler(conv_handler)
-    # application.add_handler()
 
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 if __name__ == "__main__":
     main()

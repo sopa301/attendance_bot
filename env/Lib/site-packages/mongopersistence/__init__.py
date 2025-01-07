@@ -1,0 +1,1 @@
+from mongopersistence.persistence import MongoPersistence
