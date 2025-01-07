@@ -292,7 +292,7 @@ conv_handler = ConversationHandler(
     states={
         INPUT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
         EDIT_LIST: [MessageHandler(filters.TEXT & filters.Regex("^New List$"), input_list),
-                    MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex("^Continue$"), edit_list),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex("^Continue List$"), edit_list),
                     CallbackQueryHandler(change_status, pattern="^(?!\d+$).+"),
                     CallbackQueryHandler(go_back_to_list, pattern="^\d+$")],
     },
