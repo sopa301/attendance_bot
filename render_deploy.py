@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # Define configuration constants
 URL = os.environ.get("DEPLOYMENT_URL") 
 ADMIN_CHAT_ID = 123456
-PORT = 80
+PORT = 10000
 TOKEN = os.environ.get("BOT_TOKEN")  # nosec B105
 
 persistence = MongoPersistence(
@@ -357,7 +357,7 @@ async def main() -> None:
             app=WsgiToAsgi(flask_app),
             port=PORT,
             use_colors=False,
-            host="127.0.0.1",
+            host="0.0.0.0",
         )
     )
 
