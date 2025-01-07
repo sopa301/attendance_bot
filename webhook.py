@@ -39,6 +39,7 @@ from telegram.ext import (
 )
 
 from dotenv import dotenv_values
+import os
 from enum import Enum
 
 from mongopersistence import MongoPersistence
@@ -53,25 +54,33 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # import env variables
-config = dotenv_values(".env")
+env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME", "MONGO_USER_DATA_COLLECTION_NAME"]
+def import_env(variables: list):
+    # assume either all or none of the variables are present (because we either load all or none of them)
+    all_present = all(var in os.environ for var in variables)
+    if all_present:
+        return {var: os.environ[var] for var in variables}
+    else:
+        return dotenv_values(".env")
+env_config = import_env(env_variables)
 
 # Define configuration constants
-URL = config["DEPLOYMENT_URL"] 
+URL = env_config["DEPLOYMENT_URL"] 
 ADMIN_CHAT_ID = 123456
 PORT = 80
-TOKEN = config["BOT_TOKEN"]  # nosec B105
+TOKEN = env_config["BOT_TOKEN"]  # nosec B105
 
 persistence = MongoPersistence(
-    mongo_url=config["MONGO_URL"],
-    db_name=config["MONGO_DB_NAME"],
-    name_col_user_data=config["MONGO_USER_DATA_COLLECTION_NAME"],  # optional
+    mongo_url=env_config["MONGO_URL"],
+    db_name=env_config["MONGO_DB_NAME"],
+    name_col_user_data=env_config["MONGO_USER_DATA_COLLECTION_NAME"],  # optional
     ignore_general_data=["cache"],
     ignore_user_data=["foo", "bar"],
     load_on_flush=False,
 )
 
 # CONSTANTS
-ATTENDANCE, INPUT_LIST, EDIT_LIST, SUMMARY = range(4)
+SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY = range(4)
 ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 
 PRESENT_SYMBOL = "✅"
@@ -176,12 +185,13 @@ async def start(update: Update, context: CustomContext) -> int:
 
     reply_keyboard = [["New List", "Continue List"]]
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-    return EDIT_LIST
+    return SELECT_NEW_OR_CONTINUE
 
 async def input_list(update: Update, context: CustomContext) -> int:
     message_text = update.message.text
     if (message_text == "New List"):
-        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)")
+        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
+                                        reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
       dct = parse_list(message_text)
@@ -208,6 +218,7 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
+    return EDIT_LIST
 
 
 async def summary(update: Update, context: CustomContext) -> int:
@@ -301,9 +312,10 @@ async def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
+            SELECT_NEW_OR_CONTINUE: [MessageHandler(filters.Regex("^New List$"), input_list),
+                                     MessageHandler(filters.Regex("^Continue List$"), edit_list)],
             INPUT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
-            EDIT_LIST: [MessageHandler(filters.TEXT & filters.Regex("^New List$"), input_list),
-                        MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex("^Continue List$"), edit_list),
+            EDIT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_list),
                         CallbackQueryHandler(change_status, pattern="^(?!\d+$).+"),
                         CallbackQueryHandler(go_back_to_list, pattern="^\d+$")],
         },
