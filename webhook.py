@@ -54,7 +54,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # import env variables
-env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME", "MONGO_USER_DATA_COLLECTION_NAME"]
+env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME", "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST"]
 def import_env(variables: list):
     # assume either all or none of the variables are present (because we either load all or none of them)
     all_present = all(var in os.environ for var in variables)
@@ -67,7 +67,6 @@ env_config = import_env(env_variables)
 # Define configuration constants
 URL = env_config["DEPLOYMENT_URL"] 
 ADMIN_CHAT_ID = 123456
-PORT = 80
 TOKEN = env_config["BOT_TOKEN"]  # nosec B105
 
 persistence = MongoPersistence(
@@ -366,9 +365,9 @@ async def main() -> None:
     webserver = uvicorn.Server(
         config=uvicorn.Config(
             app=WsgiToAsgi(flask_app),
-            port=PORT,
+            port=int(env_config["PORT"]),
             use_colors=False,
-            host="127.0.0.1",
+            host=env_config["HOST"],
         )
     )
 
