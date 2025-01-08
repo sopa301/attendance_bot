@@ -98,7 +98,7 @@ def generate_status_string(status: int, name: str, index: int) -> str:
         raise ValueError("Invalid status")
 
 def escape_markdown_characters(text: str) -> str:
-    characters = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+    characters = ["\\", "_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
     for character in characters:
         text = text.replace(character, f"\\{character}")
     return text
@@ -206,7 +206,7 @@ async def input_list(update: Update, context: CustomContext) -> int:
     if (message_text == "New List"):
         if "dct" in context.user_data:
             del context.user_data["dct"]
-        await update.message.reply_text("Please input the list in the following format (note that '\\' is not allowed): \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
+        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
@@ -228,7 +228,7 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     logger.info("Displaying list for %s", user.first_name)
     if ("dct" not in context.user_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
-        await update.message.reply_text("Please input the list in the following format (note that '\\' is not allowed): \n\nPickleball session 01 Jan 2025\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n...",
+        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session 01 Jan 2025\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n...",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
 
