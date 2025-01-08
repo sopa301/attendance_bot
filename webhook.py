@@ -15,6 +15,7 @@ Press Ctrl-C on the command line or send a signal to the process to stop the bot
 """
 import asyncio
 import html
+import json
 import logging
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -41,6 +42,7 @@ from telegram.ext import (
 from dotenv import dotenv_values
 import os
 from enum import Enum
+import traceback
 
 from mongopersistence import MongoPersistence
 
@@ -54,7 +56,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # import env variables
-env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME", "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST"]
+env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME", "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST", "DEVELOPER_CHAT_ID"]
 def import_env(variables: list):
     # assume either all or none of the variables are present (because we either load all or none of them)
     all_present = all(var in os.environ for var in variables)
@@ -66,7 +68,7 @@ env_config = import_env(env_variables)
 
 # Define configuration constants
 URL = env_config["DEPLOYMENT_URL"] 
-ADMIN_CHAT_ID = 123456
+ADMIN_CHAT_ID = int(env_config["DEVELOPER_CHAT_ID"])
 TOKEN = env_config["BOT_TOKEN"]  # nosec B105
 
 persistence = MongoPersistence(
@@ -181,7 +183,6 @@ def generate_summary_text(dct: dict) -> str:
 
 async def start(update: Update, context: CustomContext) -> int:
     text = "Hi!"
-
     reply_keyboard = [["New List", "Continue List"]]
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return SELECT_NEW_OR_CONTINUE
@@ -189,6 +190,8 @@ async def start(update: Update, context: CustomContext) -> int:
 async def input_list(update: Update, context: CustomContext) -> int:
     message_text = update.message.text
     if (message_text == "New List"):
+        if "dct" in context.user_data:
+            del context.user_data["dct"]
         await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
@@ -199,8 +202,7 @@ async def input_list(update: Update, context: CustomContext) -> int:
       await update.message.reply_text("Invalid list format. Please input the list again.")
       return INPUT_LIST
     summary_text = generate_summary_text(context.user_data["dct"])
-    inlinekeyboard = [[InlineKeyboardButton(s["name"], callback_data=s["name"])] for s in context.user_data["dct"]["non_regulars"]]
-    inlinekeyboard.extend(list([InlineKeyboardButton(s["name"], callback_data=s["name"])] for s in context.user_data["dct"]["regulars"]))
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
     await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
@@ -212,20 +214,29 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     logger.info("Displaying list for %s", user.first_name)
 
     summary_text = generate_summary_text(context.user_data["dct"])
-    inlinekeyboard = [[InlineKeyboardButton(s["name"], callback_data=s["name"])] for s in context.user_data["dct"]["non_regulars"]]
-    inlinekeyboard.extend(list([InlineKeyboardButton(s["name"], callback_data=s["name"])] for s in context.user_data["dct"]["regulars"]))
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
     await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
     return EDIT_LIST
 
+def generate_inline_keyboard_list_for_edit_list(dct: dict) -> list:
+    inlinekeyboard = []
+    for index, person in enumerate(dct["non_regulars"]):
+        callback_data = ",".join(["nr", str(index), person["name"]])
+        inlinekeyboard.append([InlineKeyboardButton(person["name"], callback_data=callback_data)])
+    for index, person in enumerate(dct["regulars"]):
+        callback_data = ",".join(["r", str(index), person["name"]])
+        inlinekeyboard.append([InlineKeyboardButton(person["name"], callback_data=callback_data)])
+    return inlinekeyboard
+    
 
 async def summary(update: Update, context: CustomContext) -> int:
     """Prints the attendance summary"""
     logger.info("User requested for the summary.")
     if ("dct" not in context.user_data):
         await update.message.reply_text("Please input the list first")
-        return EDIT_LIST
+        return INPUT_LIST
     summary_text = generate_summary_text(context.user_data["dct"])
     await update.message.reply_text(summary_text, parse_mode="MarkdownV2")
     return ConversationHandler.END
@@ -234,11 +245,12 @@ async def change_status(update: Update, context: CustomContext) -> None:
     """Handles the attendance status of the user."""
     user = update.callback_query.from_user
     user_data = context.user_data
+    # in the format of "user_regular_status,user_index,username"
     user_data["selected_user"] = update.callback_query.data
     logger.info("User %s selected %s", user.first_name, user_data["selected_user"])
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(
-        f"Please select the attendance status of {user_data['selected_user']}",
+        f"Please select the attendance status of {user_data['selected_user'].split(',')[2]}",
         reply_markup=InlineKeyboardMarkup(
             [
                 [InlineKeyboardButton("Absent", callback_data=ABSENT)],
@@ -248,28 +260,24 @@ async def change_status(update: Update, context: CustomContext) -> None:
         ),
     )
     
-def update_status(dct: dict, new_value: int, username: str) -> None:
-    for i, person in enumerate(dct["non_regulars"]):
-        if person["name"] == username:
-            dct["non_regulars"][i]["status"] = int(new_value)
-            return
-    for i, person in enumerate(dct["regulars"]):
-        if person["name"] == username:
-            dct["regulars"][i]["status"] = int(new_value)
-            return
-    raise ValueError("Invalid username")
+def update_status(dct: dict, new_value: int, user_regular_status: str, user_index: int, username: str) -> None:
+    if user_regular_status == "nr" and dct["non_regulars"][user_index]["name"] == username:
+        dct["non_regulars"][user_index]["status"] = new_value
+    elif user_regular_status == "r" and dct["regulars"][user_index]["name"] == username:
+        dct["regulars"][user_index]["status"] = new_value
+    else:
+        raise ValueError("Username, index, status combination not found. Query string: " + user_regular_status + ", " + str(user_index) + ", " + username)
     
-
 async def go_back_to_list(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     user_data = context.user_data
     new_value = update.callback_query.data
-    update_status(user_data["dct"], new_value, user_data["selected_user"])
+    user_status, user_index, username = user_data["selected_user"].split(",")
+    update_status(user_data["dct"], int(new_value), user_status, int(user_index), username)
     logger.info("User %s selected %s", user.first_name, new_value)
     await update.callback_query.answer()
     summary_text = generate_summary_text(context.user_data["dct"])
-    inlinekeyboard = [[InlineKeyboardButton(s["name"], callback_data=s["name"])] for s in context.user_data["dct"]["non_regulars"]]
-    inlinekeyboard.extend(list([InlineKeyboardButton(s["name"], callback_data=s["name"])] for s in context.user_data["dct"]["regulars"]))
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
     await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
@@ -297,6 +305,32 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
     )
     await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, parse_mode=ParseMode.HTML)
 
+async def error_handler(update: object, context: CustomContext) -> None:
+    """Log the error and send a telegram message to notify the developer."""
+    # Log the error before we do anything else, so we can see it even if something breaks.
+    logger.error("Exception while handling an update:", exc_info=context.error)
+
+    # traceback.format_exception returns the usual python message about an exception, but as a
+    # list of strings rather than a single string, so we have to join them together.
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+
+    # Build the message with some markup and additional information about what happened.
+    # You might need to add some logic to deal with messages longer than the 4096 character limit.
+    update_str = update.to_dict() if isinstance(update, Update) else str(update)
+    message = (
+        "An exception was raised while handling an update\n"
+        f"<pre>update = {html.escape(json.dumps(update_str, indent=2, ensure_ascii=False))}"
+        "</pre>\n\n"
+        f"<pre>context.chat_data = {html.escape(str(context.chat_data))}</pre>\n\n"
+        f"<pre>context.user_data = {html.escape(str(context.user_data))}</pre>\n\n"
+        f"<pre>{html.escape(tb_string)}</pre>"
+    )
+
+    # Finally, send the message
+    await context.bot.send_message(
+        chat_id=int(env_config["DEVELOPER_CHAT_ID"]), text=message, parse_mode=ParseMode.HTML
+    )
 
 async def main() -> None:
     """Set up PTB application and a web application for handling the incoming requests."""
@@ -322,6 +356,7 @@ async def main() -> None:
     )
     application.add_handler(conv_handler)
     application.add_handler(TypeHandler(type=WebhookUpdate, callback=webhook_update))
+    application.add_error_handler(error_handler)
 
     # Pass webhook settings to telegram
     await application.bot.set_webhook(url=f"{URL}/telegram", allowed_updates=Update.ALL_TYPES)
