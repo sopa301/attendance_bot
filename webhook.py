@@ -183,7 +183,9 @@ def generate_summary_text(dct: dict) -> str:
 
 async def start(update: Update, context: CustomContext) -> int:
     text = "Hi!"
-    reply_keyboard = [["New List", "Continue List"]]
+    reply_keyboard = [["New List"]]
+    if "dct" in context.user_data:
+        reply_keyboard[0].append("Continue List")
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return SELECT_NEW_OR_CONTINUE
 
@@ -192,7 +194,7 @@ async def input_list(update: Update, context: CustomContext) -> int:
     if (message_text == "New List"):
         if "dct" in context.user_data:
             del context.user_data["dct"]
-        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
+        await update.message.reply_text("Please input the list in the following format (note that no special characters other than '@' are allowed): \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
@@ -212,6 +214,11 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     """Allows the user to make edits to the list."""
     user = update.message.from_user
     logger.info("Displaying list for %s", user.first_name)
+    if ("dct" not in context.user_data):
+        await update.message.reply_text("You have no list yet. Please input the list first.")
+        await update.message.reply_text("Please input the list in the following format (note that no special characters other than '@' are allowed): \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
+                                        reply_markup=ReplyKeyboardRemove())
+        return INPUT_LIST
 
     summary_text = generate_summary_text(context.user_data["dct"])
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
