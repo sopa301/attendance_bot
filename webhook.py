@@ -97,13 +97,22 @@ def generate_status_string(status: int, name: str, index: int) -> str:
     else:
         raise ValueError("Invalid status")
 
+def escape_markdown_characters(text: str) -> str:
+    characters = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+    for character in characters:
+        text = text.replace(character, f"\\{character}")
+    return text
+
 def generate_absent_string(absentee: str, index: int) -> str:
+    absentee = escape_markdown_characters(absentee)
     return f"{index}\. {ABSENT_SYMBOL}{absentee}"
 
 def generate_present_string(presentee: str, index: int) -> str:
+    presentee = escape_markdown_characters(presentee)
     return f"{index}\. {PRESENT_SYMBOL}{presentee}"
 
 def generate_last_minute_cancellation_string(cancellation: str, index: int) -> str:
+    cancellation = escape_markdown_characters(cancellation)
     return f"~{index}\. {cancellation}~"
 
 @dataclass
@@ -148,7 +157,7 @@ def parse_list(message_text: str) -> dict:
     """
     lines = message_text.split("\n")
     dct = {}
-    dct["session_info"] = lines[0]
+    dct["session_info"] = lines[:lines.index("Non regulars")]
     dct["non_regulars"] = list({"name": s[s.index('.')+1:].strip(), "status": ABSENT} for s in lines[lines.index("Non regulars")+1:lines.index("Regulars")-1])
     dct["regulars"] = list({"name": s[s.index('.')+1:].strip(), "status": ABSENT} for s in lines[lines.index("Regulars")+1:lines.index("Exco")-1])
     dct["exco"] = lines[lines.index("Exco")+1:]
@@ -167,7 +176,9 @@ def generate_summary_text(dct: dict) -> str:
     1. ...
     2. ...
     """
-    output_list = [dct["session_info"], ""]
+    output_list = []
+    for line in dct["session_info"]:
+        output_list.append(escape_markdown_characters(line))
 
     output_list.append("Non regulars")
     for i, tp in enumerate(dct["non_regulars"]):
@@ -182,10 +193,11 @@ def generate_summary_text(dct: dict) -> str:
     return "\n".join(output_list)
 
 async def start(update: Update, context: CustomContext) -> int:
-    text = "Hi!"
+    text = "Hi! Please click 'New List' to input a new list."
     reply_keyboard = [["New List"]]
     if "dct" in context.user_data:
         reply_keyboard[0].append("Continue List")
+        text = "Hi! Please click 'New List' to input a new list or 'Continue List' to edit the existing list."
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return SELECT_NEW_OR_CONTINUE
 
@@ -194,7 +206,7 @@ async def input_list(update: Update, context: CustomContext) -> int:
     if (message_text == "New List"):
         if "dct" in context.user_data:
             del context.user_data["dct"]
-        await update.message.reply_text("Please input the list in the following format (note that no special characters other than '@' are allowed): \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
+        await update.message.reply_text("Please input the list in the following format (note that '\\' is not allowed): \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
@@ -216,7 +228,7 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     logger.info("Displaying list for %s", user.first_name)
     if ("dct" not in context.user_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
-        await update.message.reply_text("Please input the list in the following format (note that no special characters other than '@' are allowed): \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
+        await update.message.reply_text("Please input the list in the following format (note that '\\' is not allowed): \n\nPickleball session 01 Jan 2025\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n...",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
 
