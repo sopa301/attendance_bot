@@ -157,10 +157,39 @@ def parse_list(message_text: str) -> dict:
     """
     lines = message_text.split("\n")
     dct = {}
-    dct["session_info"] = lines[:lines.index("Non regulars")]
-    dct["non_regulars"] = list({"name": s[s.index('.')+1:].strip(), "status": ABSENT} for s in lines[lines.index("Non regulars")+1:lines.index("Regulars")-1])
-    dct["regulars"] = list({"name": s[s.index('.')+1:].strip(), "status": ABSENT} for s in lines[lines.index("Regulars")+1:lines.index("Exco")-1])
-    dct["exco"] = lines[lines.index("Exco")+1:]
+    session_info = []
+    last_non_empty_line = 0
+    for i, s in enumerate(lines[:lines.index("Non regulars")]):
+        if s != "":
+            last_non_empty_line = i
+        session_info.append(s)
+    session_info = session_info[:last_non_empty_line+1]
+    dct["session_info"] = session_info
+
+    index = 0
+    non_regulars = []
+    for s in lines[lines.index("Non regulars")+1:lines.index("Regulars")]:
+        if s == "":
+            continue
+        non_regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "nr"})
+        index += 1
+    dct["non_regulars"] = non_regulars
+
+    regulars = []
+    for s in lines[lines.index("Regulars")+1:lines.index("Exco")]:
+        if s == "":
+            continue
+        regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "r"})
+        index += 1
+    dct["regulars"] = regulars
+
+    exco = []
+    for s in lines[lines.index("Exco")+1:]:
+        if s == "":
+            continue
+        exco.append(s)
+    dct["exco"] = exco
+
     return dct
 
 def generate_summary_text(dct: dict) -> str:
@@ -179,6 +208,7 @@ def generate_summary_text(dct: dict) -> str:
     output_list = []
     for line in dct["session_info"]:
         output_list.append(escape_markdown_characters(line))
+    output_list.append("")
 
     output_list.append("Non regulars")
     for i, tp in enumerate(dct["non_regulars"]):
@@ -212,8 +242,9 @@ async def input_list(update: Update, context: CustomContext) -> int:
     try:
       dct = parse_list(message_text)
       context.user_data["dct"] = dct
-    except:
+    except Exception as e:
       await update.message.reply_text("Invalid list format. Please input the list again.")
+      logger.info(e)
       return INPUT_LIST
     summary_text = generate_summary_text(context.user_data["dct"])
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
@@ -241,11 +272,11 @@ async def edit_list(update: Update, context: CustomContext) -> int:
 
 def generate_inline_keyboard_list_for_edit_list(dct: dict) -> list:
     inlinekeyboard = []
-    for index, person in enumerate(dct["non_regulars"]):
-        callback_data = ",".join(["nr", str(index), person["name"]])
+    for _, person in enumerate(dct["non_regulars"]):
+        callback_data = person["id"]
         inlinekeyboard.append([InlineKeyboardButton(person["name"], callback_data=callback_data)])
-    for index, person in enumerate(dct["regulars"]):
-        callback_data = ",".join(["r", str(index), person["name"]])
+    for _, person in enumerate(dct["regulars"]):
+        callback_data = person["id"]
         inlinekeyboard.append([InlineKeyboardButton(person["name"], callback_data=callback_data)])
     return inlinekeyboard
     
@@ -264,35 +295,57 @@ async def change_status(update: Update, context: CustomContext) -> None:
     """Handles the attendance status of the user."""
     user = update.callback_query.from_user
     user_data = context.user_data
-    # in the format of "user_regular_status,user_index,username"
-    user_data["selected_user"] = update.callback_query.data
-    logger.info("User %s selected %s", user.first_name, user_data["selected_user"])
+    # in the format of "user_id"
+    user_data["selected_id"] = update.callback_query.data
+    selected_user = None
+    for person in user_data["dct"]["non_regulars"]:
+        if person["id"] == int(user_data["selected_id"]):
+            selected_user = person
+            break
+    
+    if selected_user is None:
+        for person in user_data["dct"]["regulars"]:
+            if person["id"] == int(user_data["selected_id"]):
+                selected_user = person
+                break
+    if selected_user is None:
+        raise ValueError("User not found")
+    
+    del user_data["selected_id"]
+    user_data["selected_user"] = selected_user
+    logger.info("User %s selected %s with id %s", user.first_name, selected_user["name"], selected_user["id"])
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(
-        f"Please select the attendance status of {user_data['selected_user'].split(',')[2]}",
+        f"Please select the attendance status of {selected_user['name']}",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Absent", callback_data=ABSENT)],
-                [InlineKeyboardButton("Present", callback_data=PRESENT)],
-                [InlineKeyboardButton("Last Minute Cancellation", callback_data=LAST_MINUTE_CANCELLATION)],
+                [InlineKeyboardButton("Absent", callback_data=f"s{ABSENT}")],
+                [InlineKeyboardButton("Present", callback_data=f"s{PRESENT}")],
+                [InlineKeyboardButton("Last Minute Cancellation", callback_data=f"s{LAST_MINUTE_CANCELLATION}")],
             ]
         ),
     )
     
-def update_status(dct: dict, new_value: int, user_regular_status: str, user_index: int, username: str) -> None:
-    if user_regular_status == "nr" and dct["non_regulars"][user_index]["name"] == username:
-        dct["non_regulars"][user_index]["status"] = new_value
-    elif user_regular_status == "r" and dct["regulars"][user_index]["name"] == username:
-        dct["regulars"][user_index]["status"] = new_value
-    else:
-        raise ValueError("Username, index, status combination not found. Query string: " + user_regular_status + ", " + str(user_index) + ", " + username)
+def update_status(dct: dict, new_value: int, membership: str, user_id: int, username: str) -> None:
+    if membership == "nr":
+        for person in dct["non_regulars"]:
+            if person["id"] == user_id:
+                person["status"] = new_value
+                return
+    elif membership == "r":
+        for person in dct["regulars"]:
+            if person["id"] == user_id:
+                person["status"] = new_value
+                return
+    raise ValueError("Username, index, status combination not found. Query string: " + membership + ", " + str(user_id) + ", " + username)
     
 async def go_back_to_list(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     user_data = context.user_data
-    new_value = update.callback_query.data
-    user_status, user_index, username = user_data["selected_user"].split(",")
-    update_status(user_data["dct"], int(new_value), user_status, int(user_index), username)
+    new_value = update.callback_query.data[1:]
+    selected_user = user_data["selected_user"]
+    membership, user_id, username = selected_user["membership"], selected_user["id"], selected_user["name"]
+    update_status(user_data["dct"], int(new_value), membership, user_id, username)
     logger.info("User %s selected %s", user.first_name, new_value)
     await update.callback_query.answer()
     summary_text = generate_summary_text(context.user_data["dct"])
@@ -300,6 +353,7 @@ async def go_back_to_list(update: Update, context: CustomContext) -> None:
     await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
+    del user_data["selected_user"]
 
 
 async def cancel(update: Update, context: CustomContext) -> int:
@@ -307,7 +361,7 @@ async def cancel(update: Update, context: CustomContext) -> int:
     user = update.message.from_user
     logger.info("User %s canceled the conversation.", user.first_name)
     await update.message.reply_text(
-        "Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove()
+        "Bye!", reply_markup=ReplyKeyboardRemove()
     )
 
     return ConversationHandler.END
@@ -368,8 +422,8 @@ async def main() -> None:
                                      MessageHandler(filters.Regex("^Continue List$"), edit_list)],
             INPUT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
             EDIT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_list),
-                        CallbackQueryHandler(change_status, pattern="^(?!\d+$).+"),
-                        CallbackQueryHandler(go_back_to_list, pattern="^\d+$")],
+                        CallbackQueryHandler(change_status, pattern="^\d+$"),
+                        CallbackQueryHandler(go_back_to_list, pattern="^(?!\d+$).+")],
         },
         fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
     )
