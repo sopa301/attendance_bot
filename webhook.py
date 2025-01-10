@@ -225,7 +225,7 @@ def generate_summary_text(dct: dict) -> str:
 async def start(update: Update, context: CustomContext) -> int:
     text = "Hi! Please click 'New List' to input a new list."
     reply_keyboard = [["New List"]]
-    if "dct" in context.user_data:
+    if "dct" in context.chat_data:
         reply_keyboard[0].append("Continue List")
         text = "Hi! Please click 'New List' to input a new list or 'Continue List' to edit the existing list."
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -234,20 +234,20 @@ async def start(update: Update, context: CustomContext) -> int:
 async def input_list(update: Update, context: CustomContext) -> int:
     message_text = update.message.text
     if (message_text == "New List"):
-        if "dct" in context.user_data:
-            del context.user_data["dct"]
+        if "dct" in context.chat_data:
+            del context.chat_data["dct"]
         await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
       dct = parse_list(message_text)
-      context.user_data["dct"] = dct
+      context.chat_data["dct"] = dct
     except Exception as e:
       await update.message.reply_text("Invalid list format. Please input the list again.")
       logger.info(e)
       return INPUT_LIST
-    summary_text = generate_summary_text(context.user_data["dct"])
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
+    summary_text = generate_summary_text(context.chat_data["dct"])
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.chat_data["dct"])
     await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
@@ -257,14 +257,14 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     """Allows the user to make edits to the list."""
     user = update.message.from_user
     logger.info("Displaying list for %s", user.first_name)
-    if ("dct" not in context.user_data):
+    if ("dct" not in context.chat_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
         await update.message.reply_text("Please input the list in the following format: \n\nPickleball session 01 Jan 2025\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n...",
                                         reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
 
-    summary_text = generate_summary_text(context.user_data["dct"])
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
+    summary_text = generate_summary_text(context.chat_data["dct"])
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.chat_data["dct"])
     await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
@@ -284,17 +284,17 @@ def generate_inline_keyboard_list_for_edit_list(dct: dict) -> list:
 async def summary(update: Update, context: CustomContext) -> int:
     """Prints the attendance summary"""
     logger.info("User requested for the summary.")
-    if ("dct" not in context.user_data):
+    if ("dct" not in context.chat_data):
         await update.message.reply_text("Please input the list first")
         return INPUT_LIST
-    summary_text = generate_summary_text(context.user_data["dct"])
+    summary_text = generate_summary_text(context.chat_data["dct"])
     await update.message.reply_text(summary_text, parse_mode="MarkdownV2")
     return ConversationHandler.END
 
 async def change_status(update: Update, context: CustomContext) -> None:
     """Handles the attendance status of the user."""
     user = update.callback_query.from_user
-    user_data = context.user_data
+    user_data = context.chat_data
     # in the format of "user_id"
     user_data["selected_id"] = update.callback_query.data
     selected_user = None
@@ -341,15 +341,15 @@ def update_status(dct: dict, new_value: int, membership: str, user_id: int, user
     
 async def go_back_to_list(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
-    user_data = context.user_data
+    user_data = context.chat_data
     new_value = update.callback_query.data[1:]
     selected_user = user_data["selected_user"]
     membership, user_id, username = selected_user["membership"], selected_user["id"], selected_user["name"]
     update_status(user_data["dct"], int(new_value), membership, user_id, username)
     logger.info("User %s selected %s", user.first_name, new_value)
     await update.callback_query.answer()
-    summary_text = generate_summary_text(context.user_data["dct"])
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.user_data["dct"])
+    summary_text = generate_summary_text(context.chat_data["dct"])
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.chat_data["dct"])
     await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
