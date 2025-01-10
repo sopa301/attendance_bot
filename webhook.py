@@ -56,7 +56,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # import env variables
-env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME", "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST", "DEVELOPER_CHAT_ID"]
+env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME",
+                 "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST", "DEVELOPER_CHAT_ID",
+                 "MONGO_CHAT_DATA_COLLECTION_NAME"]
 def import_env(variables: list):
     # assume either all or none of the variables are present (because we either load all or none of them)
     all_present = all(var in os.environ for var in variables)
@@ -75,6 +77,7 @@ persistence = MongoPersistence(
     mongo_url=env_config["MONGO_URL"],
     db_name=env_config["MONGO_DB_NAME"],
     name_col_user_data=env_config["MONGO_USER_DATA_COLLECTION_NAME"],  # optional
+    name_col_chat_data=env_config["MONGO_CHAT_DATA_COLLECTION_NAME"],  # optional
     ignore_general_data=["cache"],
     ignore_user_data=["foo", "bar"],
     load_on_flush=False,
