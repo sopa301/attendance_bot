@@ -181,3 +181,10 @@ class AttendanceList():
     attendance_list.exco = exco
 
     return attendance_list
+  
+  @classmethod
+  def from_poll(poll):
+    attendance_list = AttendanceList()
+    attendance_list.details = [poll.title, poll.details]
+    attendance_list.non_regulars = [{"name": person, "status": ABSENT, "id": i, "membership": "nr"} for i, person in enumerate(poll.people)]
+    return attendance_list
