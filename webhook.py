@@ -1,18 +1,3 @@
-#!/usr/bin/env python
-# This program is dedicated to the public domain under the CC0 license.
-# pylint: disable=import-error,unused-argument
-"""
-Simple example of a bot that uses a custom webhook setup and handles custom updates.
-For the custom webhook setup, the libraries `flask`, `asgiref` and `uvicorn` are used. Please
-install them as `pip install flask[async]~=2.3.2 uvicorn~=0.23.2 asgiref~=3.7.2`.
-Note that any other `asyncio` based web server framework can be used for a custom webhook setup
-just as well.
-
-Usage:
-Set bot Token, URL, admin CHAT_ID and PORT after the imports.
-You may also need to change the `listen` value in the uvicorn configuration to match your setup.
-Press Ctrl-C on the command line or send a signal to the process to stop the bot.
-"""
 import asyncio
 import html
 import json
@@ -38,13 +23,13 @@ from telegram.ext import (
     TypeHandler,
     filters,
 )
-
-from dotenv import dotenv_values
-import os
-from enum import Enum
 import traceback
-
 from mongopersistence import MongoPersistence
+
+from util.objects import AttendanceList
+from util import import_env
+from util.texts import ABSENT, PRESENT, LAST_MINUTE_CANCELLATION, \
+                      REQUEST_FOR_ATTENDANCE_LIST_INPUT
 
 # Enable logging
 logging.basicConfig(
@@ -59,13 +44,6 @@ logger = logging.getLogger(__name__)
 env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME",
                  "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST", "DEVELOPER_CHAT_ID",
                  "MONGO_CHAT_DATA_COLLECTION_NAME"]
-def import_env(variables: list):
-    # assume either all or none of the variables are present (because we either load all or none of them)
-    all_present = all(var in os.environ for var in variables)
-    if all_present:
-        return {var: os.environ[var] for var in variables}
-    else:
-        return dotenv_values(".env")
 env_config = import_env(env_variables)
 
 # Define configuration constants
@@ -85,38 +63,6 @@ persistence = MongoPersistence(
 
 # CONSTANTS
 SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY = range(4)
-ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
-
-PRESENT_SYMBOL = "✅"
-ABSENT_SYMBOL = "❌"
-
-def generate_status_string(status: int, name: str, index: int) -> str:
-    if status == ABSENT:
-        return generate_absent_string(name, index)
-    elif status == PRESENT:
-        return generate_present_string(name, index)
-    elif status == LAST_MINUTE_CANCELLATION:
-        return generate_last_minute_cancellation_string(name, index)
-    else:
-        raise ValueError("Invalid status")
-
-def escape_markdown_characters(text: str) -> str:
-    characters = ["\\", "_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
-    for character in characters:
-        text = text.replace(character, f"\\{character}")
-    return text
-
-def generate_absent_string(absentee: str, index: int) -> str:
-    absentee = escape_markdown_characters(absentee)
-    return f"{index}\. {ABSENT_SYMBOL}{absentee}"
-
-def generate_present_string(presentee: str, index: int) -> str:
-    presentee = escape_markdown_characters(presentee)
-    return f"{index}\. {PRESENT_SYMBOL}{presentee}"
-
-def generate_last_minute_cancellation_string(cancellation: str, index: int) -> str:
-    cancellation = escape_markdown_characters(cancellation)
-    return f"~{index}\. {cancellation}~"
 
 @dataclass
 class WebhookUpdate:
@@ -142,89 +88,6 @@ class CustomContext(CallbackContext[ExtBot, dict, dict, dict]):
             return cls(application=application, user_id=update.user_id)
         return super().from_update(update, application)
 
-def parse_list(message_text: str) -> dict:
-    """
-    Parses the list in this format: 
-    Pickleball session (date)
-
-    Non regulars
-    1. ...
-    2. ...
-
-    Regulars
-    1. ...
-    2. ...
-
-    Exco
-    (Name)
-    """
-    lines = message_text.split("\n")
-    dct = {}
-    session_info = []
-    last_non_empty_line = 0
-    for i, s in enumerate(lines[:lines.index("Non regulars")]):
-        if s != "":
-            last_non_empty_line = i
-        session_info.append(s)
-    session_info = session_info[:last_non_empty_line+1]
-    dct["session_info"] = session_info
-
-    index = 0
-    non_regulars = []
-    for s in lines[lines.index("Non regulars")+1:lines.index("Regulars")]:
-        if s == "":
-            continue
-        non_regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "nr"})
-        index += 1
-    dct["non_regulars"] = non_regulars
-
-    regulars = []
-    for s in lines[lines.index("Regulars")+1:lines.index("Exco")]:
-        if s == "":
-            continue
-        regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "r"})
-        index += 1
-    dct["regulars"] = regulars
-
-    exco = []
-    for s in lines[lines.index("Exco")+1:]:
-        if s == "":
-            continue
-        exco.append(s)
-    dct["exco"] = exco
-
-    return dct
-
-def generate_summary_text(dct: dict) -> str:
-    """
-    Generates the attendance summary in this format:
-    Pickleball session (date)
-
-    Non regulars
-    1. ...
-    2. ...
-
-    Regulars
-    1. ...
-    2. ...
-    """
-    output_list = []
-    for line in dct["session_info"]:
-        output_list.append(escape_markdown_characters(line))
-    output_list.append("")
-
-    output_list.append("Non regulars")
-    for i, tp in enumerate(dct["non_regulars"]):
-      output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
-
-    output_list.append("")
-
-    output_list.append("Regulars")
-    for i, tp in enumerate(dct["regulars"]):
-      output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
-
-    return "\n".join(output_list)
-
 async def start(update: Update, context: CustomContext) -> int:
     text = "Hi! Please click 'New List' to input a new list."
     reply_keyboard = [["New List"]]
@@ -239,21 +102,16 @@ async def input_list(update: Update, context: CustomContext) -> int:
     if (message_text == "New List"):
         if "dct" in context.chat_data:
             del context.chat_data["dct"]
-        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n(Name)",
-                                        reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
-      dct = parse_list(message_text)
-      context.chat_data["dct"] = dct
+      attendance_list = AttendanceList.parse_list(message_text)
+      context.chat_data["dct"] = attendance_list.to_dict()
     except Exception as e:
       await update.message.reply_text("Invalid list format. Please input the list again.")
       logger.info(e)
       return INPUT_LIST
-    summary_text = generate_summary_text(context.chat_data["dct"])
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.chat_data["dct"])
-    await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
-                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
-                                    parse_mode="MarkdownV2")
+    await display_edit_list(AttendanceList.from_dict(context.chat_data["dct"]), update)
     return EDIT_LIST
 
 async def edit_list(update: Update, context: CustomContext) -> int:
@@ -262,25 +120,33 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     logger.info("Displaying list for %s", user.first_name)
     if ("dct" not in context.chat_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
-        await update.message.reply_text("Please input the list in the following format: \n\nPickleball session 01 Jan 2025\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nExco\n...",
-                                        reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
+    await display_edit_list(AttendanceList.from_dict(context.chat_data["dct"]), update)
+    return EDIT_LIST
 
-    summary_text = generate_summary_text(context.chat_data["dct"])
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.chat_data["dct"])
+async def display_edit_list(attendance_list: AttendanceList, update: Update) -> None:
+    summary_text = attendance_list.generate_summary_text()
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
     await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
-    return EDIT_LIST
 
-def generate_inline_keyboard_list_for_edit_list(dct: dict) -> list:
+def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList) -> list:
     inlinekeyboard = []
-    for _, person in enumerate(dct["non_regulars"]):
+    DO_NOTHING = "."
+    inlinekeyboard.append([InlineKeyboardButton("NON REGULARS", callback_data=DO_NOTHING)])
+    for index, person in enumerate(attendance_list.non_regulars):
         callback_data = person["id"]
-        inlinekeyboard.append([InlineKeyboardButton(person["name"], callback_data=callback_data)])
-    for _, person in enumerate(dct["regulars"]):
+        inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {person['name']}", callback_data=callback_data)])
+    inlinekeyboard.append([InlineKeyboardButton("REGULARS", callback_data=DO_NOTHING)])
+    for index, person in enumerate(attendance_list.regulars):
         callback_data = person["id"]
-        inlinekeyboard.append([InlineKeyboardButton(person["name"], callback_data=callback_data)])
+        inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {person['name']}", callback_data=callback_data)])
+    inlinekeyboard.append([InlineKeyboardButton("STANDINS", callback_data=DO_NOTHING)])
+    for index, person in enumerate(attendance_list.standins):
+        callback_data = person["id"]
+        inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {person['name']}", callback_data=callback_data)])
     return inlinekeyboard
     
 
@@ -290,7 +156,8 @@ async def summary(update: Update, context: CustomContext) -> int:
     if ("dct" not in context.chat_data):
         await update.message.reply_text("Please input the list first")
         return INPUT_LIST
-    summary_text = generate_summary_text(context.chat_data["dct"])
+    attendance_list = AttendanceList.from_dict(context.chat_data["dct"])
+    summary_text = attendance_list.generate_summary_text()
     await update.message.reply_text(summary_text, parse_mode="MarkdownV2")
     return ConversationHandler.END
 
@@ -298,22 +165,10 @@ async def change_status(update: Update, context: CustomContext) -> None:
     """Handles the attendance status of the user."""
     user = update.callback_query.from_user
     user_data = context.chat_data
-    # in the format of "user_id"
+    attendance_list = AttendanceList.from_dict(user_data["dct"])
     user_data["selected_id"] = update.callback_query.data
-    selected_user = None
-    for person in user_data["dct"]["non_regulars"]:
-        if person["id"] == int(user_data["selected_id"]):
-            selected_user = person
-            break
-    
-    if selected_user is None:
-        for person in user_data["dct"]["regulars"]:
-            if person["id"] == int(user_data["selected_id"]):
-                selected_user = person
-                break
-    if selected_user is None:
-        raise ValueError("User not found")
-    
+    selected_user = attendance_list.find_user_by_id(int(user_data["selected_id"]))
+    user_data["dct"] = attendance_list.to_dict()
     del user_data["selected_id"]
     user_data["selected_user"] = selected_user
     logger.info("User %s selected %s with id %s", user.first_name, selected_user["name"], selected_user["id"])
@@ -328,36 +183,24 @@ async def change_status(update: Update, context: CustomContext) -> None:
             ]
         ),
     )
-    
-def update_status(dct: dict, new_value: int, membership: str, user_id: int, username: str) -> None:
-    if membership == "nr":
-        for person in dct["non_regulars"]:
-            if person["id"] == user_id:
-                person["status"] = new_value
-                return
-    elif membership == "r":
-        for person in dct["regulars"]:
-            if person["id"] == user_id:
-                person["status"] = new_value
-                return
-    raise ValueError("Username, index, status combination not found. Query string: " + membership + ", " + str(user_id) + ", " + username)
-    
+   
 async def go_back_to_list(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     user_data = context.chat_data
     new_value = update.callback_query.data[1:]
     selected_user = user_data["selected_user"]
-    membership, user_id, username = selected_user["membership"], selected_user["id"], selected_user["name"]
-    update_status(user_data["dct"], int(new_value), membership, user_id, username)
+    del user_data["selected_user"]
+    user_id = selected_user["id"]
+    attendance_list = AttendanceList.from_dict(user_data["dct"])
+    attendance_list.update_user_status(user_id, int(new_value))
+    user_data["dct"] = attendance_list.to_dict()
     logger.info("User %s selected %s", user.first_name, new_value)
     await update.callback_query.answer()
-    summary_text = generate_summary_text(context.chat_data["dct"])
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(context.chat_data["dct"])
+    summary_text = attendance_list.generate_summary_text()
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
     await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
-    del user_data["selected_user"]
-
 
 async def cancel(update: Update, context: CustomContext) -> int:
     """Cancels and ends the conversation."""
@@ -408,6 +251,10 @@ async def error_handler(update: object, context: CustomContext) -> None:
         chat_id=int(env_config["DEVELOPER_CHAT_ID"]), text=message, parse_mode=ParseMode.HTML
     )
 
+async def do_nothing(update: Update, context: CustomContext) -> None:
+    """Answer the callback query but do nothing."""
+    await update.callback_query.answer()
+
 async def main() -> None:
     """Set up PTB application and a web application for handling the incoming requests."""
     context_types = ContextTypes(context=CustomContext)
@@ -426,6 +273,7 @@ async def main() -> None:
             INPUT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
             EDIT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_list),
                         CallbackQueryHandler(change_status, pattern="^\d+$"),
+                        CallbackQueryHandler(do_nothing, pattern="^.$"), # this needs to be first to avoid matching the other pattern
                         CallbackQueryHandler(go_back_to_list, pattern="^(?!\d+$).+")],
         },
         fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],

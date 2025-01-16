@@ -1,14 +1,9 @@
-import asyncio
 import html
 import json
 import logging
 from dataclasses import dataclass
-from http import HTTPStatus
-import requests
 
-import uvicorn
-from asgiref.wsgi import WsgiToAsgi
-from flask import Flask, Response, abort, make_response, request
+from flask import Flask, request
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -26,12 +21,12 @@ from telegram.ext import (
     filters,
 )
 
-from dotenv import dotenv_values
-import os
-from enum import Enum
 import traceback
 
 from mongopersistence import MongoPersistence
+
+from util import import_env
+from util.texts import generate_summary_text, parse_list, ABSENT, PRESENT, LAST_MINUTE_CANCELLATION
 
 # Enable logging
 logging.basicConfig(
@@ -48,19 +43,12 @@ app = Flask(__name__)
 env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME",
                  "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST", "DEVELOPER_CHAT_ID",
                  "MONGO_CHAT_DATA_COLLECTION_NAME"]
-def import_env(variables: list):
-    # assume either all or none of the variables are present (because we either load all or none of them)
-    all_present = all(var in os.environ for var in variables)
-    if all_present:
-        return {var: os.environ[var] for var in variables}
-    else:
-        return dotenv_values(".env")
 env_config = import_env(env_variables)
 
 # Define configuration constants
 URL = env_config["DEPLOYMENT_URL"] 
 ADMIN_CHAT_ID = int(env_config["DEVELOPER_CHAT_ID"])
-TOKEN = env_config["BOT_TOKEN"]  # nosec B105
+TOKEN = env_config["BOT_TOKEN"]
 
 persistence = MongoPersistence(
     mongo_url=env_config["MONGO_URL"],
@@ -87,45 +75,7 @@ class CustomContext(CallbackContext[ExtBot, dict, dict, dict]):
         if isinstance(update, WebhookUpdate):
             return cls(application=application, user_id=update.user_id)
         return super().from_update(update, application)
-
-context_types = ContextTypes(context=CustomContext)
-application = ApplicationBuilder().token(env_config["BOT_TOKEN"]).context_types(context_types).persistence(persistence).build()
-
-# CONSTANTS
-SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY = range(4)
-ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
-
-PRESENT_SYMBOL = "✅"
-ABSENT_SYMBOL = "❌"
-
-def generate_status_string(status: int, name: str, index: int) -> str:
-    if status == ABSENT:
-        return generate_absent_string(name, index)
-    elif status == PRESENT:
-        return generate_present_string(name, index)
-    elif status == LAST_MINUTE_CANCELLATION:
-        return generate_last_minute_cancellation_string(name, index)
-    else:
-        raise ValueError("Invalid status")
-
-def escape_markdown_characters(text: str) -> str:
-    characters = ["\\", "_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
-    for character in characters:
-        text = text.replace(character, f"\\{character}")
-    return text
-
-def generate_absent_string(absentee: str, index: int) -> str:
-    absentee = escape_markdown_characters(absentee)
-    return f"{index}\. {ABSENT_SYMBOL}{absentee}"
-
-def generate_present_string(presentee: str, index: int) -> str:
-    presentee = escape_markdown_characters(presentee)
-    return f"{index}\. {PRESENT_SYMBOL}{presentee}"
-
-def generate_last_minute_cancellation_string(cancellation: str, index: int) -> str:
-    cancellation = escape_markdown_characters(cancellation)
-    return f"~{index}\. {cancellation}~"
-
+    
 @dataclass
 class WebhookUpdate:
     """Simple dataclass to wrap a custom update type"""
@@ -133,90 +83,28 @@ class WebhookUpdate:
     user_id: int
     payload: str
 
-def parse_list(message_text: str) -> dict:
-    """
-    Parses the list in this format: 
-    Pickleball session (date)
+context_types = ContextTypes(context=CustomContext)
+# application = ApplicationBuilder().token(env_config["BOT_TOKEN"]).context_types(context_types).persistence(persistence).build()
 
-    Non regulars
-    1. ...
-    2. ...
-
-    Regulars
-    1. ...
-    2. ...
-
-    Exco
-    (Name)
-    """
-    lines = message_text.split("\n")
-    dct = {}
-    session_info = []
-    last_non_empty_line = 0
-    for i, s in enumerate(lines[:lines.index("Non regulars")]):
-        if s != "":
-            last_non_empty_line = i
-        session_info.append(s)
-    session_info = session_info[:last_non_empty_line+1]
-    dct["session_info"] = session_info
-
-    index = 0
-    non_regulars = []
-    for s in lines[lines.index("Non regulars")+1:lines.index("Regulars")]:
-        if s == "":
-            continue
-        non_regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "nr"})
-        index += 1
-    dct["non_regulars"] = non_regulars
-
-    regulars = []
-    for s in lines[lines.index("Regulars")+1:lines.index("Exco")]:
-        if s == "":
-            continue
-        regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "r"})
-        index += 1
-    dct["regulars"] = regulars
-
-    exco = []
-    for s in lines[lines.index("Exco")+1:]:
-        if s == "":
-            continue
-        exco.append(s)
-    dct["exco"] = exco
-
-    return dct
-
-def generate_summary_text(dct: dict) -> str:
-    """
-    Generates the attendance summary in this format:
-    Pickleball session (date)
-
-    Non regulars
-    1. ...
-    2. ...
-
-    Regulars
-    1. ...
-    2. ...
-    """
-    output_list = []
-    for line in dct["session_info"]:
-        output_list.append(escape_markdown_characters(line))
-    output_list.append("")
-
-    output_list.append("Non regulars")
-    for i, tp in enumerate(dct["non_regulars"]):
-      output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
-
-    output_list.append("")
-
-    output_list.append("Regulars")
-    for i, tp in enumerate(dct["regulars"]):
-      output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
-
-    return "\n".join(output_list)
+application = ApplicationBuilder().token(env_config["BOT_TOKEN"]).context_types(context_types).build()
+# CONSTANTS
+SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY = range(4)
 
 async def start(update: Update, context: CustomContext) -> int:
+    """Sends a message when the command /start is issued."""
+    user = update.message.from_user
+    logger.info("User %s started the conversation.", user.first_name)
+    await update.message.reply_text(
+        "Hi! I am the attendance bot. Please click:\n"
+        "/new_poll to create a new weekly poll\n"
+        "/attendance to start taking attendance for the upcoming event\n"
+        "/polls to manage your polls\n"
+        "/help to get help\n"
+        "/cancel to cancel the conversation",
+        )
+    return ConversationHandler.END
+
+async def attendance(update: Update, context: CustomContext) -> int:
     text = "Hi! Please click 'New List' to input a new list."
     reply_keyboard = [["New List"]]
     if "dct" in context.chat_data:
@@ -360,11 +248,6 @@ async def cancel(update: Update, context: CustomContext) -> int:
 
     return ConversationHandler.END
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(update.message.text)
-
-# echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), echo)
-# application.add_handler(echo_handler)
 async def error_handler(update: object, context: CustomContext) -> None:
     """Log the error and send a telegram message to notify the developer."""
     # Log the error before we do anything else, so we can see it even if something breaks.
@@ -406,7 +289,7 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
 
 # register handlers
 conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("start", start)],
+    entry_points=[CommandHandler("start", start), CommandHandler("attendance", attendance)],
     states={
         SELECT_NEW_OR_CONTINUE: [MessageHandler(filters.Regex("^New List$"), input_list),
                                   MessageHandler(filters.Regex("^Continue List$"), edit_list)],

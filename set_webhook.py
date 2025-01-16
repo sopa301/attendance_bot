@@ -1,16 +1,8 @@
-import os
-from dotenv import dotenv_values
+from util import import_env
 import requests
 
 # import env variables
 env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN"]
-def import_env(variables: list):
-    # assume either all or none of the variables are present (because we either load all or none of them)
-    all_present = all(var in os.environ for var in variables)
-    if all_present:
-        return {var: os.environ[var] for var in variables}
-    else:
-        return dotenv_values(".env")
 env_config = import_env(env_variables)
 
 # Dummy Telegram webhook data
