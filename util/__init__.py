@@ -8,4 +8,3 @@ def import_env(variables: list):
         return {var: os.environ[var] for var in variables}
     else:
         return dotenv_values(".env")
-    
