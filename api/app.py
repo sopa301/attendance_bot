@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from flask import Flask, request
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, ReplyKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, ReplyKeyboardMarkup, Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -16,6 +16,7 @@ from telegram.ext import (
     ConversationHandler,
     ContextTypes,
     ExtBot,
+    InlineQueryHandler,
     MessageHandler,
     TypeHandler,
     filters,
@@ -43,7 +44,7 @@ app = Flask(__name__)
 
 # import env variables
 env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME",
-                 "MONGO_USER_DATA_COLLECTION_NAME", "PORT", "HOST", "DEVELOPER_CHAT_ID",
+                 "MONGO_USER_DATA_COLLECTION_NAME", "DEVELOPER_CHAT_ID",
                  "MONGO_CHAT_DATA_COLLECTION_NAME"]
 env_config = import_env(env_variables)
 
@@ -78,7 +79,8 @@ class WebhookUpdate:
 context_types = ContextTypes(context=CustomContext)
 application = ApplicationBuilder().token(env_config["BOT_TOKEN"]).context_types(context_types).build()
 # CONSTANTS
-SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY, SETTING_STATUS, GET_NUMBER_OF_EVENTS, GET_TITLE = range(7)
+SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY, SETTING_STATUS, \
+GET_NUMBER_OF_EVENTS, GET_TITLE, GET_DETAILS, GET_START_TIME, GET_END_TIME = range(10)
 
 async def start(update: Update, context: CustomContext) -> int:
     """Sends a message when the command /start is issued."""
@@ -101,23 +103,85 @@ async def create_new_poll(update: Update, context: CustomContext) -> int:
     await update.message.reply_text("Please input the number of events you want to poll for.")
     return GET_NUMBER_OF_EVENTS
 
+# currently, the thing only accepts one event. TODO: implement up to n events
 async def get_number_of_events(update: Update, context: CustomContext) -> int:
     try:
         number_of_events = int(update.message.text)
-        context.chat_data["number_of_events"] = number_of_events
+        context.user_data["number_of_events"] = number_of_events
         await update.message.reply_text("Please input the title of the poll.")
         return GET_TITLE
     except ValueError:
         await update.message.reply_text("Please input a valid number.")
         return GET_NUMBER_OF_EVENTS
 
+# TODO: handle invalid input
 async def get_title(update: Update, context: CustomContext) -> int:
-    pass
+    title = update.message.text
+    context.user_data["title"] = title
+    await update.message.reply_text("Please input the details of the poll.")
+    return GET_DETAILS
+
+# TODO: handle invalid input
+async def get_details(update: Update, context: CustomContext) -> int:
+    details = update.message.text
+    context.user_data["details"] = details
+    await update.message.reply_text("Poll created successfully.")
+    return GET_START_TIME
+
+# TODO: handle invalid input
+async def get_start_time(update: Update, context: CustomContext) -> int:
+    start_time = update.message.text
+    context.user_data["start_time"] = start_time
+    await update.message.reply_text("Please input the end time of the poll.")
+    return GET_END_TIME
+
+# TODO: handle invalid input, logic to loop back for multiple events
+async def get_end_time(update: Update, context: CustomContext) -> int:
+    end_time = update.message.text
+    context.user_data["end_time"] = end_time
+    await update.message.reply_text("Poll created.")
+    # TODO: create buttons to publish the poll, update results, or delete the poll
+
+    # create a button to forward a message with inline buttons to another chat
+    # inline_keyboard = [[InlineKeyboardButton("Send Poll", switch_inline_query="forward_poll")]]
+    # await update.message.reply_text("Please click the button below to send the poll to another chat.",
+    #                                 reply_markup=InlineKeyboardMarkup(inline_keyboard))
+    return ConversationHandler.END
+
+
+async def forward_poll(update: Update, context: CustomContext) -> None:
+    query = update.inline_query.query
+    results = []  # Prepare response options for inline query
+
+    if query:
+        # Define inline buttons
+        keyboard = [
+            [
+                InlineKeyboardButton("Button 1", callback_data="button_1"),
+                InlineKeyboardButton("Button 2", callback_data="button_2"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Add the inline query result with buttons
+        results.append(
+            InlineQueryResultArticle(
+                id="1",
+                title="Send Message",
+                input_message_content=InputTextMessageContent(
+                    "Hello! This is your selected message."
+                ),
+                reply_markup=reply_markup,  # Attach inline buttons here
+            )
+        )
+    
+    await update.inline_query.answer(results)
+   
 
 async def attendance(update: Update, context: CustomContext) -> int:
     text = "Hi! Please click 'New List' to input a new list."
     reply_keyboard = [["New List"]]
-    if "dct" in context.chat_data:
+    if "dct" in context.user_data:
         reply_keyboard[0].append("Continue List")
         text = "Hi! Please click 'New List' to input a new list or 'Continue List' to edit the existing list."
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -126,30 +190,30 @@ async def attendance(update: Update, context: CustomContext) -> int:
 async def input_list(update: Update, context: CustomContext) -> int:
     message_text = update.message.text
     if (message_text == "New List"):
-        if "dct" in context.chat_data:
-            del context.chat_data["dct"]
+        if "dct" in context.user_data:
+            del context.user_data["dct"]
         await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
       attendance_list = AttendanceList.parse_list(message_text)
-      context.chat_data["dct"] = attendance_list.to_dict()
+      context.user_data["dct"] = attendance_list.to_dict()
     except Exception as e:
       await update.message.reply_text("Invalid list format. Please input the list again.")
       logger.info(e)
       return INPUT_LIST
-    await display_edit_list(AttendanceList.from_dict(context.chat_data["dct"]), update)
+    await display_edit_list(AttendanceList.from_dict(context.user_data["dct"]), update)
     return EDIT_LIST
 
 async def edit_list(update: Update, context: CustomContext) -> int:
     """Allows the user to make edits to the list."""
     user = update.message.from_user
     logger.info("Displaying list for %s", user.first_name)
-    if ("dct" not in context.chat_data):
+    if ("dct" not in context.user_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
         await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
-    await display_edit_list(AttendanceList.from_dict(context.chat_data["dct"]), update)
-    return EDIT_LIST
+    await display_edit_list(AttendanceList.from_dict(context.user_data["dct"]), update)
+    return ConversationHandler.END
 
 async def display_edit_list(attendance_list: AttendanceList, update: Update) -> None:
     summary_text = attendance_list.generate_summary_text()
@@ -178,10 +242,10 @@ def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList)
 async def summary(update: Update, context: CustomContext) -> int:
     """Prints the attendance summary"""
     logger.info("User requested for the summary.")
-    if ("dct" not in context.chat_data):
+    if ("dct" not in context.user_data):
         await update.message.reply_text("Please input the list first")
         return INPUT_LIST
-    attendance_list = AttendanceList.from_dict(context.chat_data["dct"])
+    attendance_list = AttendanceList.from_dict(context.user_data["dct"])
     summary_text = attendance_list.generate_summary_text()
     await update.message.reply_text(summary_text, parse_mode="MarkdownV2")
     return ConversationHandler.END
@@ -189,7 +253,7 @@ async def summary(update: Update, context: CustomContext) -> int:
 async def change_status(update: Update, context: CustomContext) -> None:
     """Handles the attendance status of the user."""
     user = update.callback_query.from_user
-    user_data = context.chat_data
+    user_data = context.user_data
     attendance_list = AttendanceList.from_dict(user_data["dct"])
     user_data["selected_id"] = update.callback_query.data
     selected_user = attendance_list.find_user_by_id(int(user_data["selected_id"]))
@@ -212,7 +276,7 @@ async def change_status(update: Update, context: CustomContext) -> None:
     
 async def setting_user_status(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
-    user_data = context.chat_data
+    user_data = context.user_data
     new_value = update.callback_query.data[1:]
     selected_user = user_data["selected_user"]
     del user_data["selected_user"]
@@ -284,10 +348,21 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
     )
     await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, parse_mode=ParseMode.HTML)
 
+async def poll_response(update: Update, context: CustomContext) -> None:
+    """Handles InlineKeyboardButton for poll response."""
+    user = update.message.from_user
+    logger.info("User %s responded to the poll.", user.first_name)
+    # send a message to the admin that the user has responded to the poll
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=f"{user.mention_html()} has responded to the poll.",
+        parse_mode=ParseMode.HTML,
+    )
+
 # register handlers
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start), CommandHandler("attendance", attendance),
-                  CommandHandler("new_poll", create_new_poll)],
+                  CommandHandler("new_poll", create_new_poll), CommandHandler("summary", summary)],
     states={
         SELECT_NEW_OR_CONTINUE: [MessageHandler(filters.Regex("^New List$"), input_list),
                                   MessageHandler(filters.Regex("^Continue List$"), edit_list)],
@@ -297,9 +372,15 @@ conv_handler = ConversationHandler(
                         CallbackQueryHandler(do_nothing, pattern="^.$")],
         SETTING_STATUS: [CallbackQueryHandler(setting_user_status, pattern="^(?!\d+$).+")],
         GET_NUMBER_OF_EVENTS: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
+        GET_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
+        GET_DETAILS: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
+        GET_START_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
+        GET_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)]
     },
     fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
 )
+application.add_handler(InlineQueryHandler(forward_poll, pattern="^forward_poll$"))
+application.add_handler(CallbackQueryHandler(poll_response, pattern="^poll$"))
 application.add_handler(conv_handler)
 application.add_handler(TypeHandler(type=WebhookUpdate, callback=webhook_update))
 application.add_error_handler(error_handler)
