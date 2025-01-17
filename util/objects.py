@@ -10,7 +10,8 @@ class EventPoll():
   def __init__(self, start_time, end_time, title, details, type, number_of_distinct_groups, allocations):
     self.start_time = start_time # start time of event
     self.end_time = end_time
-    self.people = []
+    self.regulars = []
+    self.non_regulars = []
     self.title = title
     self.details = details
     self.type = type

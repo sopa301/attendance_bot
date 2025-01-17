@@ -24,9 +24,7 @@ from telegram.ext import (
 
 import traceback
 
-from mongopersistence import MongoPersistence
-
-from util.objects import AttendanceList
+from util.objects import AttendanceList, PollGroup, EventPoll
 from util import import_env
 from util.texts import ABSENT, PRESENT, LAST_MINUTE_CANCELLATION, \
                       REQUEST_FOR_ATTENDANCE_LIST_INPUT
@@ -44,14 +42,11 @@ app = Flask(__name__)
 
 # import env variables
 env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN", "MONGO_URL", "MONGO_DB_NAME",
-                 "MONGO_USER_DATA_COLLECTION_NAME", "DEVELOPER_CHAT_ID",
-                 "MONGO_CHAT_DATA_COLLECTION_NAME"]
+                 "DEVELOPER_CHAT_ID"]
 env_config = import_env(env_variables)
 
 # Define configuration constants
-URL = env_config["DEPLOYMENT_URL"] 
 ADMIN_CHAT_ID = int(env_config["DEVELOPER_CHAT_ID"])
-TOKEN = env_config["BOT_TOKEN"]
 
 class CustomContext(CallbackContext[ExtBot, dict, dict, dict]):
     """
@@ -79,8 +74,13 @@ class WebhookUpdate:
 context_types = ContextTypes(context=CustomContext)
 application = ApplicationBuilder().token(env_config["BOT_TOKEN"]).context_types(context_types).build()
 # CONSTANTS
-SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY, SETTING_STATUS, \
-GET_NUMBER_OF_EVENTS, GET_TITLE, GET_DETAILS, GET_START_TIME, GET_END_TIME = range(10)
+routes = {}
+route_names = ["SELECT_NEW_OR_CONTINUE", "INPUT_LIST", "EDIT_LIST", "SUMMARY", "SETTING_STATUS", \
+               "GET_NUMBER_OF_EVENTS", "GET_TITLE", "GET_DETAILS", "GET_START_TIME", "GET_END_TIME"]
+for i, route_name in enumerate(route_names):
+    routes[route_name] = i
+# SELECT_NEW_OR_CONTINUE, INPUT_LIST, EDIT_LIST, SUMMARY, SETTING_STATUS, \
+# GET_NUMBER_OF_EVENTS, GET_TITLE, GET_DETAILS, GET_START_TIME, GET_END_TIME = range(10)
 
 async def start(update: Update, context: CustomContext) -> int:
     """Sends a message when the command /start is issued."""
@@ -101,7 +101,7 @@ async def create_new_poll(update: Update, context: CustomContext) -> int:
     user = update.message.from_user
     logger.info("User %s requested to create a new poll.", user.first_name)
     await update.message.reply_text("Please input the number of events you want to poll for.")
-    return GET_NUMBER_OF_EVENTS
+    return routes["GET_NUMBER_OF_EVENTS"]
 
 # currently, the thing only accepts one event. TODO: implement up to n events
 async def get_number_of_events(update: Update, context: CustomContext) -> int:
@@ -109,74 +109,193 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
         number_of_events = int(update.message.text)
         context.user_data["number_of_events"] = number_of_events
         await update.message.reply_text("Please input the title of the poll.")
-        return GET_TITLE
+        return routes["GET_TITLE"]
     except ValueError:
         await update.message.reply_text("Please input a valid number.")
-        return GET_NUMBER_OF_EVENTS
+        return routes["GET_NUMBER_OF_EVENTS"]
 
 # TODO: handle invalid input
 async def get_title(update: Update, context: CustomContext) -> int:
     title = update.message.text
     context.user_data["title"] = title
     await update.message.reply_text("Please input the details of the poll.")
-    return GET_DETAILS
+    return routes["GET_DETAILS"]
 
 # TODO: handle invalid input
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Poll created successfully.")
-    return GET_START_TIME
+    await update.message.reply_text("Please input the start time of the poll.")
+    return routes["GET_START_TIME"]
 
 # TODO: handle invalid input
 async def get_start_time(update: Update, context: CustomContext) -> int:
     start_time = update.message.text
     context.user_data["start_time"] = start_time
     await update.message.reply_text("Please input the end time of the poll.")
-    return GET_END_TIME
+    return routes["GET_END_TIME"]
 
 # TODO: handle invalid input, logic to loop back for multiple events
 async def get_end_time(update: Update, context: CustomContext) -> int:
     end_time = update.message.text
     context.user_data["end_time"] = end_time
     await update.message.reply_text("Poll created.")
-    # TODO: create buttons to publish the poll, update results, or delete the poll
+    # TODO: create buttons to publish the poll to both groups, update results, or delete the poll
+
+    # TODO: create entry in DB
+    poll_id = 1 # dummy poll id
+    # create the inline buttons for all
+    inline_keyboard = [[InlineKeyboardButton("Publish Non Regular Poll", switch_inline_query=f"nr_{poll_id}")],
+                        [InlineKeyboardButton("Publish Regular Poll", switch_inline_query=f"r_{poll_id}")],
+                        [InlineKeyboardButton("Update Results", callback_data=f"u_{poll_id}")], 
+                        [InlineKeyboardButton("Delete Poll", callback_data=f"d_{poll_id}")]]
 
     # create a button to forward a message with inline buttons to another chat
-    # inline_keyboard = [[InlineKeyboardButton("Send Poll", switch_inline_query="forward_poll")]]
-    # await update.message.reply_text("Please click the button below to send the poll to another chat.",
-    #                                 reply_markup=InlineKeyboardMarkup(inline_keyboard))
+    await update.message.reply_text("Please click the button below to send the poll to another chat.",
+                                    reply_markup=InlineKeyboardMarkup(inline_keyboard))
     return ConversationHandler.END
 
 
+def generate_poll_voting_callback_data(poll_id: int, poll_type: str, index: int) -> str:
+    return f"p_{poll_type}_{poll_id}_{index}"
+
+def generate_poll_group_text(poll_group: PollGroup, poll_type) -> str:
+    poll_body = [poll_group.name + "\n"]
+    for i, poll in enumerate(poll_group.polls):
+        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{poll.start_time} - {poll.end_time}\n")
+        if poll_type == "nr":
+            lst = poll.non_regulars
+        elif poll_type == "r":
+            lst = poll.regulars
+        else:
+            raise ValueError("Invalid poll type: " + poll_type)
+        for j, person in enumerate(lst):
+            poll_body.append(f"{j+1}. {person}")
+        poll_body.append("\n")
+    poll_body = "\n".join(poll_body)
+    return poll_body
+
 async def forward_poll(update: Update, context: CustomContext) -> None:
     query = update.inline_query.query
+    # parse the query in the format "nr_{poll_id}" or "r_{poll_id}"
+    poll_id = query.split("_")[1]
+    if query.startswith("nr"):
+        poll_type = "nr"
+    elif query.startswith("r"):
+        poll_type = "r"
+    else:
+        raise ValueError("Invalid query type: " + query)
+
+    # TODO: retrieve poll details from DB
+    poll_group = get_poll_group_from_db(poll_id)
+
+    keyboard = []
+    for i, poll in enumerate(poll_group.polls):
+        keyboard.append([InlineKeyboardButton(f"{poll.title}",
+                                              callback_data=generate_poll_voting_callback_data(poll_group.id, poll_type, i))])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    poll_body = generate_poll_group_text(poll_group, poll_type)
     results = []  # Prepare response options for inline query
-
-    if query:
-        # Define inline buttons
-        keyboard = [
-            [
-                InlineKeyboardButton("Button 1", callback_data="button_1"),
-                InlineKeyboardButton("Button 2", callback_data="button_2"),
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Add the inline query result with buttons
-        results.append(
-            InlineQueryResultArticle(
-                id="1",
-                title="Send Message",
-                input_message_content=InputTextMessageContent(
-                    "Hello! This is your selected message."
-                ),
-                reply_markup=reply_markup,  # Attach inline buttons here
-            )
+    # Add the inline query result with buttons
+    results.append(
+        InlineQueryResultArticle(
+            id=poll_id,
+            title="Send Poll",
+            input_message_content=InputTextMessageContent(
+                poll_body,
+            ),
+            reply_markup=reply_markup,  # Attach inline buttons here
         )
+    )
     
     await update.inline_query.answer(results)
    
+def get_poll_voting_callback_data(query: str) -> tuple:
+    poll_type, poll_id, index = query.split("_")[1:]
+    return int(poll_id), poll_type, int(index)
+
+# TODO: make this real
+def get_poll_group_from_db(poll_id: int) -> PollGroup:
+    poll_group = PollGroup(poll_id, "Regular Sessions", 2)
+    poll1 = EventPoll("2022-01-01 00:00:00", "2022-01-01 23:59:59", "Pickleball", "Multipurpose Courts", "Regular", 2, [12, 12])
+    poll2 = EventPoll("2022-01-02 00:00:00", "2022-01-02 23:59:59", "Pickleball2", "Multipurpose Courts2", "Regular", 2, [12, 12])
+    poll_group.polls = [poll1, poll2]
+    return poll_group
+
+# TODO
+def save_poll_group_to_db(poll_group: PollGroup) -> None:
+    pass
+
+async def handle_poll_voting_callback(update: Update, context: CustomContext) -> None:
+    user = update.callback_query.from_user
+    logger.info("User %s responded to the poll.", user.username)
+    # send a message to the admin that the user has responded to the poll
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=f"{user.mention_html()} has responded to the poll.",
+        parse_mode=ParseMode.HTML,
+    )
+    query = update.callback_query.data
+    poll_id, poll_type, index = get_poll_voting_callback_data(query)
+    poll_group = get_poll_group_from_db(poll_id)
+    username = update.callback_query.from_user.username
+    if poll_type == "nr":
+        poll = poll_group.polls[index]
+        if username in poll.non_regulars:
+            poll.non_regulars.remove(username)
+        else:
+            poll.non_regulars.append(username)
+    elif poll_type == "r":
+        poll = poll_group.polls[index]
+        if username in poll.regulars:
+            poll.regulars.remove(username)
+        else:
+            poll.regulars.append(username)
+    else:
+        raise ValueError("Invalid poll type: " + poll_type)
+    save_poll_group_to_db(poll_group)
+    await update.callback_query.answer()
+    # update the list to show the new status
+    keyboard = []
+    for i, poll in enumerate(poll_group.polls):
+        keyboard.append([InlineKeyboardButton(f"{poll.title}",
+                                              callback_data=generate_poll_voting_callback_data(poll_group.id, poll_type, i))])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    poll_body = generate_poll_group_text(poll_group, poll_type)
+    await update.callback_query.edit_message_text(poll_body, reply_markup=reply_markup)
+
+def get_update_results_callback_data(query: str) -> int:
+    return int(query.split("_")[1])
+
+async def handle_update_results_callback(update: Update, context: CustomContext) -> None:
+    user = update.callback_query.from_user
+    logger.info("User %s requested the latest results of the poll.", user.username)
+    data = update.callback_query.data
+    poll_id = get_update_results_callback_data(data)
+    poll_group = get_poll_group_from_db(poll_id)
+    combined_text = "Non Regulars:\n" + generate_poll_group_text(poll_group, "nr") + "\n\nRegulars\n" + generate_poll_group_text(poll_group, "r")
+    inline_keyboard = [[InlineKeyboardButton("Publish Non Regular Poll", switch_inline_query=f"nr_{poll_id}")],
+                        [InlineKeyboardButton("Publish Regular Poll", switch_inline_query=f"r_{poll_id}")],
+                        [InlineKeyboardButton("Update Results", callback_data=f"u_{poll_id}")], 
+                        [InlineKeyboardButton("Delete Poll", callback_data=f"d_{poll_id}")]]
+    await update.callback_query.edit_message_text(combined_text, reply_markup=InlineKeyboardMarkup(inline_keyboard))
+    await update.callback_query.answer()
+
+def get_delete_poll_callback_data(query: str) -> int:
+    return int(query.split("_")[1])
+
+def delete_poll_from_db(poll_id: int) -> None:
+    pass
+
+async def handle_delete_poll_callback(update: Update, context: CustomContext) -> None:
+    user = update.callback_query.from_user
+    logger.info("User %s requested to delete the poll.", user.username)
+    # TODO: add confirmation
+    data = update.callback_query.data
+    poll_id = get_delete_poll_callback_data(data)
+    delete_poll_from_db(poll_id)
+    await update.callback_query.edit_message_text("Poll deleted.")
 
 async def attendance(update: Update, context: CustomContext) -> int:
     text = "Hi! Please click 'New List' to input a new list."
@@ -185,7 +304,7 @@ async def attendance(update: Update, context: CustomContext) -> int:
         reply_keyboard[0].append("Continue List")
         text = "Hi! Please click 'New List' to input a new list or 'Continue List' to edit the existing list."
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-    return SELECT_NEW_OR_CONTINUE
+    return routes["SELECT_NEW_OR_CONTINUE"]
 
 async def input_list(update: Update, context: CustomContext) -> int:
     message_text = update.message.text
@@ -193,16 +312,16 @@ async def input_list(update: Update, context: CustomContext) -> int:
         if "dct" in context.user_data:
             del context.user_data["dct"]
         await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
-        return INPUT_LIST
+        return routes["INPUT_LIST"]
     try:
       attendance_list = AttendanceList.parse_list(message_text)
       context.user_data["dct"] = attendance_list.to_dict()
     except Exception as e:
       await update.message.reply_text("Invalid list format. Please input the list again.")
       logger.info(e)
-      return INPUT_LIST
+      return routes["INPUT_LIST"]
     await display_edit_list(AttendanceList.from_dict(context.user_data["dct"]), update)
-    return EDIT_LIST
+    return routes["EDIT_LIST"]
 
 async def edit_list(update: Update, context: CustomContext) -> int:
     """Allows the user to make edits to the list."""
@@ -211,7 +330,7 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     if ("dct" not in context.user_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
         await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
-        return INPUT_LIST
+        return routes["INPUT_LIST"]
     await display_edit_list(AttendanceList.from_dict(context.user_data["dct"]), update)
     return ConversationHandler.END
 
@@ -244,7 +363,7 @@ async def summary(update: Update, context: CustomContext) -> int:
     logger.info("User requested for the summary.")
     if ("dct" not in context.user_data):
         await update.message.reply_text("Please input the list first")
-        return INPUT_LIST
+        return routes["INPUT_LIST"]
     attendance_list = AttendanceList.from_dict(context.user_data["dct"])
     summary_text = attendance_list.generate_summary_text()
     await update.message.reply_text(summary_text, parse_mode="MarkdownV2")
@@ -272,7 +391,7 @@ async def change_status(update: Update, context: CustomContext) -> None:
             ]
         ),
     )
-    return SETTING_STATUS
+    return routes["SETTING_STATUS"]
     
 async def setting_user_status(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
@@ -291,7 +410,7 @@ async def setting_user_status(update: Update, context: CustomContext) -> None:
     await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
-    return EDIT_LIST
+    return routes["EDIT_LIST"]
 
 
 
@@ -348,39 +467,30 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
     )
     await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text, parse_mode=ParseMode.HTML)
 
-async def poll_response(update: Update, context: CustomContext) -> None:
-    """Handles InlineKeyboardButton for poll response."""
-    user = update.message.from_user
-    logger.info("User %s responded to the poll.", user.first_name)
-    # send a message to the admin that the user has responded to the poll
-    await context.bot.send_message(
-        chat_id=ADMIN_CHAT_ID,
-        text=f"{user.mention_html()} has responded to the poll.",
-        parse_mode=ParseMode.HTML,
-    )
-
 # register handlers
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start), CommandHandler("attendance", attendance),
                   CommandHandler("new_poll", create_new_poll), CommandHandler("summary", summary)],
     states={
-        SELECT_NEW_OR_CONTINUE: [MessageHandler(filters.Regex("^New List$"), input_list),
+        routes["SELECT_NEW_OR_CONTINUE"]: [MessageHandler(filters.Regex("^New List$"), input_list),
                                   MessageHandler(filters.Regex("^Continue List$"), edit_list)],
-        INPUT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
-        EDIT_LIST: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_list),
+        routes["INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
+        routes["EDIT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_list),
                         CallbackQueryHandler(change_status, pattern="^\d+$"),
                         CallbackQueryHandler(do_nothing, pattern="^.$")],
-        SETTING_STATUS: [CallbackQueryHandler(setting_user_status, pattern="^(?!\d+$).+")],
-        GET_NUMBER_OF_EVENTS: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
-        GET_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
-        GET_DETAILS: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
-        GET_START_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
-        GET_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)]
+        routes["SETTING_STATUS"]: [CallbackQueryHandler(setting_user_status, pattern="^(?!\d+$).+")],
+        routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
+        routes["GET_TITLE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
+        routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
+        routes["GET_START_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
+        routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)]
     },
     fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
 )
-application.add_handler(InlineQueryHandler(forward_poll, pattern="^forward_poll$"))
-application.add_handler(CallbackQueryHandler(poll_response, pattern="^poll$"))
+application.add_handler(InlineQueryHandler(forward_poll))
+application.add_handler(CallbackQueryHandler(handle_poll_voting_callback, pattern="^p_"))
+application.add_handler(CallbackQueryHandler(handle_update_results_callback, pattern="^u_"))
+application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern="^d_"))
 application.add_handler(conv_handler)
 application.add_handler(TypeHandler(type=WebhookUpdate, callback=webhook_update))
 application.add_error_handler(error_handler)
