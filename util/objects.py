@@ -7,50 +7,78 @@ class PollType(Enum):
   ADHOC = 1
 
 class EventPoll():
-  def __init__(self, start_time, end_time, title, details, type, number_of_distinct_groups, allocations):
+  def __init__(self, start_time, end_time, title, details, allocations):
+    self.id = None
     self.start_time = start_time # start time of event
     self.end_time = end_time
     self.regulars = []
     self.non_regulars = []
     self.title = title
     self.details = details
-    self.type = type
-    self.number_of_distinct_groups = number_of_distinct_groups
+    self.type = PollType.WEEKLY
+    self.number_of_distinct_groups = 2
     self.allocations = allocations
+    self.poll_group_id = None
 
   def to_dict(self):
     return {
+      "id": self.id,
       "start_time": self.start_time,
       "end_time": self.end_time,
-      "people": self.people,
+      "regulars": self.regulars,
+      "non_regulars": self.non_regulars,
       "title": self.title,
-      "details": self.details
+      "details": self.details,
+      "type": self.type.value,
+      "allocations": self.allocations,
+      "poll_group_id": self.poll_group_id
     }
   
   @staticmethod
   def from_dict(dct):
-    poll = EventPoll(dct["start_time"], dct["end_time"], dct["title"], dct["details"])
-    poll.people = dct["people"]
+    poll = EventPoll(dct["start_time"], dct["end_time"], dct["title"], dct["details"], dct["allocations"])
+    poll.id = dct["id"]
+    poll.regulars = dct["regulars"]
+    poll.non_regulars = dct["non_regulars"]
+    poll.number_of_distinct_groups = 2
+    poll.type = PollType(dct["type"])
+    poll.poll_group_id = dct["poll_group_id"]
     return poll
+  
+  def insert_id(self, id):
+    self.id = id
 
 class PollGroup():
-  def __init__(self, id, name, number_of_distinct_groups):
-    self.polls = []
-    self.id = id
+  def __init__(self, owner_id, name):
+    self.polls_ids = []
+    self.owner_id = owner_id
+    self.id = None
     self.name = name
-    self.number_of_distinct_groups = number_of_distinct_groups
+    self.number_of_distinct_groups = 2
 
   def to_dict(self):
     return {
-      "polls": [poll.to_dict() for poll in self.polls],
       "id": self.id,
-      "name": self.name
+      "owner_id": self.owner_id,
+      "name": self.name,
+      "polls_ids": self.polls_ids
     }
+  
+  def insert_id(self, id):
+    self.id = id
+
+  def insert_poll_ids(self, poll_ids):
+    self.polls_ids = poll_ids
+
+  def get_poll_ids(self):
+    return self.polls_ids
   
   @staticmethod
   def from_dict(dct):
-    group = PollGroup(dct["id"], dct["name"])
-    group.polls = [EventPoll.from_dict(poll) for poll in dct["polls"]]
+    group = PollGroup(dct["owner_id"], dct["name"])
+    group.id = dct["id"]
+    group.polls_ids = dct["polls_ids"]
+    group.number_of_distinct_groups = 2
     return group
 
 class AttendanceList():
