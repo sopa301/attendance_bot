@@ -97,6 +97,7 @@ async def start(update: Update, context: CustomContext) -> int:
     await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return SELECT_NEW_OR_CONTINUE
 
+# Callback handlers
 async def input_list(update: Update, context: CustomContext) -> int:
     message_text = update.message.text
     if (message_text == "New List"):
