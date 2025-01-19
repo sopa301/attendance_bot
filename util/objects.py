@@ -6,6 +6,9 @@ class PollType(Enum):
   WEEKLY = 0
   ADHOC = 1
 
+# TODO: figure out how to handle old poll messages when the poll group is deleted
+# also handle the updating of all messages when a poll is updated
+# also handle the updating of all messages after the week passes
 class EventPoll():
   def __init__(self, start_time, end_time, title, details, allocations):
     self.id = None
@@ -48,6 +51,8 @@ class EventPoll():
   def insert_id(self, id):
     self.id = id
 
+# TODO: create the aggregated poll results in the db as well for efficient access.
+# remember to use transactions to ensure that the poll results are consistent
 class PollGroup():
   def __init__(self, owner_id, name):
     self.polls_ids = []
