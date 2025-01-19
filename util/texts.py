@@ -1,5 +1,10 @@
 REQUEST_FOR_ATTENDANCE_LIST_INPUT = "Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
 
+INFO_TEXT = "This bot is designed to help you manage your weekly events between a regular and non-regular chat. " \
+        + "You can create a new poll for your event, take attendance, and view the results of the poll. " \
+        + "To get started, click /new_poll to create a new poll, /attendance to start taking attendance for the upcoming event, " \
+        + "or /polls to manage your polls."
+
 ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 
 PRESENT_SYMBOL = "✅"
