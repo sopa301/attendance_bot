@@ -15,6 +15,22 @@ polls_collection = db[env_config["MONGO_COLLECTION_NAME"]]
 groups_collection = db[env_config["MONGO_COLLECTION_NAME"]]
 attendance_collection = db[env_config["MONGO_COLLECTION_NAME"]]
 
+# Custom error for when objects are not found
+class PollNotFoundError(Exception):
+    def __init__(self, poll_id):
+        self.poll_id = poll_id
+        if type(poll_id) is str:
+          self.message = "Poll not found with id: " + poll_id
+        else:
+          self.message = "Polls not found with ids: " + ", ".join(poll_id)
+        super().__init__(self.message)
+
+class PollGroupNotFoundError(Exception):
+    def __init__(self, group_id):
+        self.group_id = group_id
+        self.message = "Poll group not found with id: " + group_id
+        super().__init__(self.message)
+
 # Insert functions
 def insert_event_poll(poll) -> str:
     return polls_collection.insert_one(poll.to_dict()).inserted_id.__str__()
@@ -33,18 +49,27 @@ def insert_attendance_list(attendance):
 
 # Retrieve functions
 def get_event_poll(poll_id):
-    event_poll = EventPoll.from_dict(polls_collection.find_one({"_id": ObjectId(poll_id)}))
+    event_poll_json = polls_collection.find_one({"_id": ObjectId(poll_id)})
+    if event_poll_json is None:
+        raise PollNotFoundError(poll_id)
+    event_poll = EventPoll.from_dict(event_poll_json)
     event_poll.insert_id(poll_id)
     return event_poll
 
 def get_event_polls(poll_ids):
-    event_polls = list(map(lambda x: EventPoll.from_dict(x), polls_collection.find({"_id": {"$in": list(map(lambda x: ObjectId(x), poll_ids))}})))
+    event_polls_jsons = list(polls_collection.find({"_id": {"$in": list(map(lambda x: ObjectId(x), poll_ids))}}))
+    if len(event_polls_jsons) != len(poll_ids):
+        raise PollNotFoundError(poll_ids)
+    event_polls = list(map(lambda x: EventPoll.from_dict(x), event_polls_jsons))
     for i, poll in enumerate(event_polls):
         poll.insert_id(poll_ids[i])
     return event_polls
 
 def get_poll_group(group_id):
-    poll_group = PollGroup.from_dict(groups_collection.find_one({"_id": ObjectId(group_id)}))
+    poll_group_json = groups_collection.find_one({"_id": ObjectId(group_id)})
+    if poll_group_json is None:
+        raise PollGroupNotFoundError(group_id)
+    poll_group = PollGroup.from_dict(poll_group_json)
     poll_group.insert_id(group_id)
     return poll_group
 

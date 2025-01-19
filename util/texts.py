@@ -1,9 +1,20 @@
-REQUEST_FOR_ATTENDANCE_LIST_INPUT = "Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
+
+
+START_TEXT = "Hi! I am the attendance bot. Please click:\n" \
+        + "/new_poll to create a new weekly poll\n" \
+        + "/attendance to manage attendance for an event\n" \
+        + "/polls to manage your polls\n" \
+        + "/info to get information about this bot\n" \
+        + "/cancel to cancel the conversation" \
+
+REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT = "Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
 
 INFO_TEXT = "This bot is designed to help you manage your weekly events between a regular and non-regular chat. " \
         + "You can create a new poll for your event, take attendance, and view the results of the poll. " \
         + "To get started, click /new_poll to create a new poll, /attendance to start taking attendance for the upcoming event, " \
         + "or /polls to manage your polls."
+
+CANCEL_TEXT = "Bye!"
 
 ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 

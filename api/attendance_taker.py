@@ -5,7 +5,7 @@ from telegram.ext import (
 import logging
 
 from util.objects import AttendanceList
-from util.texts import ABSENT, PRESENT, LAST_MINUTE_CANCELLATION, REQUEST_FOR_ATTENDANCE_LIST_INPUT
+from util.texts import ABSENT, PRESENT, LAST_MINUTE_CANCELLATION, REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT
 
 from api.util import CustomContext, routes
 
@@ -23,7 +23,7 @@ async def input_list(update: Update, context: CustomContext) -> int:
     if (message_text == "New List"):
         if "dct" in context.user_data:
             del context.user_data["dct"]
-        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT, reply_markup=ReplyKeyboardRemove())
         return routes["INPUT_LIST"]
     try:
       attendance_list = AttendanceList.parse_list(message_text)
@@ -41,7 +41,7 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     logger.info("Displaying list for %s", user.first_name)
     if ("dct" not in context.user_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
-        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT, reply_markup=ReplyKeyboardRemove())
         return routes["INPUT_LIST"]
     await display_edit_list(AttendanceList.from_dict(context.user_data["dct"]), update)
     return ConversationHandler.END
