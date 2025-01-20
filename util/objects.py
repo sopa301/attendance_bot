@@ -117,19 +117,26 @@ class PollGroup():
 
 class AttendanceList():
   def __init__(self):
+    self.id = None
+    self.owner_id = None
     self.details = []
     self.non_regulars = []
     self.regulars = []
     self.exco = []
     self.standins = []
   
+  def insert_owner_id(self, owner_id):
+    self.owner_id = owner_id
+
   def to_dict(self):
     return {
+      "id": self.id,
+      "owner_id": self.owner_id,
       "details": self.details,
       "non_regulars": self.non_regulars,
       "regulars": self.regulars,
-      "standins": self.standins,
-      "exco": self.exco
+      "exco": self.exco,
+      "standins": self.standins
     }
   
   def find_user_by_id(self, id: int):
@@ -176,6 +183,8 @@ class AttendanceList():
   @staticmethod
   def from_dict(dct):
     attendance_list = AttendanceList()
+    attendance_list.owner_id = dct["owner_id"]
+    attendance_list.id = dct["id"]
     attendance_list.details = dct["details"]
     attendance_list.non_regulars = dct["non_regulars"]
     attendance_list.regulars = dct["regulars"]
@@ -210,31 +219,9 @@ class AttendanceList():
         session_info.append(s)
     session_info = session_info[:last_non_empty_line+1]
     attendance_list.details = session_info
-
-    index = 0
-    non_regulars = []
-    for s in lines[lines.index("Non regulars")+1:lines.index("Regulars")]:
-        if s == "":
-            continue
-        non_regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "nr"})
-        index += 1
-    attendance_list.non_regulars = non_regulars
-
-    regulars = []
-    for s in lines[lines.index("Regulars")+1:lines.index("Standins")]:
-        if s == "":
-            continue
-        regulars.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "r"})
-        index += 1
-    attendance_list.regulars = regulars
-
-    standins = []
-    for s in lines[lines.index("Standins")+1:lines.index("Exco")]:
-        if s == "":
-            continue
-        standins.append({"name": s[s.index('.')+1:].strip(), "status": ABSENT, "id": index, "membership": "nr"})
-        index += 1
-    attendance_list.standins = standins
+    attendance_list.non_regulars = AttendanceList.parse_section(lines, "Non regulars", "Regulars", "nr")
+    attendance_list.regulars = AttendanceList.parse_section(lines, "Regulars", "Standins", "r")
+    attendance_list.standins = AttendanceList.parse_section(lines, "Standins", "Exco", "nr")
 
     exco = []
     for s in lines[lines.index("Exco")+1:]:
@@ -245,12 +232,18 @@ class AttendanceList():
 
     return attendance_list
   
-  @classmethod
-  def from_poll(poll):
-    attendance_list = AttendanceList()
-    attendance_list.details = [poll.title, poll.details]
-    attendance_list.non_regulars = [{"name": person, "status": ABSENT, "id": i, "membership": "nr"} for i, person in enumerate(poll.people)]
-    return attendance_list
+  @staticmethod
+  def parse_section(lines, divider1, divider2, membership) -> list:
+    lst = []
+    for s in lines[lines.index(divider1)+1:lines.index(divider2)]:
+      if s == "":
+        continue
+      name = s[s.index('.')+1:].strip()
+      lst.append({"name": name, "status": ABSENT, "id": name, "membership": membership})
+    return lst
+
+  def insert_id(self, id):
+    self.id = id
 
 # Indicate if function has executed - else message to return to user stored
 class Status():

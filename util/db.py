@@ -31,6 +31,12 @@ class PollGroupNotFoundError(Exception):
         self.message = "Poll group not found with id: " + group_id
         super().__init__(self.message)
 
+class AttendanceListNotFoundError(Exception):
+    def __init__(self, attendance_id):
+        self.attendance_id = attendance_id
+        self.message = "Attendance list not found with id: " + attendance_id
+        super().__init__(self.message)
+
 # Insert functions
 def insert_event_poll(poll) -> str:
     return polls_collection.insert_one(poll.to_dict()).inserted_id.__str__()
@@ -80,6 +86,21 @@ def get_poll_groups_by_owner_id(owner_id):
         group.insert_id(poll_group_jsons[i]["_id"].__str__())
     return poll_groups
 
+def get_attendance_list(attendance_id):
+    attendance_json = attendance_collection.find_one({"_id": ObjectId(attendance_id)})
+    if attendance_json is None:
+        raise AttendanceListNotFoundError(attendance_id)
+    attendance = AttendanceList.from_dict(attendance_json)
+    attendance.insert_id(attendance_id)
+    return attendance
+
+def get_attendance_lists_by_owner_id(owner_id):
+    attendance_jsons = list(attendance_collection.find({"owner_id": owner_id}))
+    attendance_lists = list(map(lambda x: AttendanceList.from_dict(x), attendance_jsons))
+    for i, attendance in enumerate(attendance_lists):
+        attendance.insert_id(attendance_jsons[i]["_id"].__str__())
+    return attendance_lists
+
 # Update functions
 def update_poll_group_id(poll_ids, group_id):
     return polls_collection.update_many(
@@ -99,6 +120,13 @@ def remove_person_from_event_poll(poll_id, username, field):
       {"$pull": {field: username}}
     )
 
+# TODO: Make this function more efficient
+def update_attendance_list(attendance_id, attendance_list):
+    return attendance_collection.update_one(
+      {"_id": ObjectId(attendance_id)},
+      {"$set": attendance_list.to_dict()}
+    )
+
 # Delete functions
 def delete_event_poll(poll_id):
     return polls_collection.delete_one({"_id": ObjectId(poll_id)})
@@ -110,6 +138,9 @@ def delete_poll_group(group_id):
     poll_group = get_poll_group(group_id)
     delete_event_polls(poll_group.get_poll_ids())
     return groups_collection.delete_one({"_id": ObjectId(group_id)})
+
+def delete_attendance_list(attendance_id):
+    return attendance_collection.delete_one({"_id": ObjectId(attendance_id)})
 
 
 if __name__ == "__main__":

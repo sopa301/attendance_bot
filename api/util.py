@@ -39,8 +39,8 @@ class WebhookUpdate:
     payload: str
 
 routes = {}
-route_names = ["SELECT_NEW_OR_CONTINUE", "INPUT_LIST", "EDIT_LIST", "SUMMARY", "SETTING_STATUS", \
+route_names = ["SELECT_NEW_OR_CONTINUE", "INPUT_LIST", "VIEW_LIST", "SUMMARY", "SETTING_STATUS", \
                "GET_NUMBER_OF_EVENTS", "GET_TITLE", "GET_DETAILS", "GET_START_TIME", "GET_END_TIME",
-               "SELECT_POLL_GROUP", "GET_POLL_NAME"]
+               "SELECT_POLL_GROUP", "GET_POLL_NAME", "RECEIVE_INPUT_LIST"]
 for i, route_name in enumerate(route_names):
     routes[route_name] = i

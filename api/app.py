@@ -34,7 +34,7 @@ from util.helper import parse_dt_to_iso, compare_time
 from util.encodings import *
 from util.texts import INFO_TEXT, START_TEXT, CANCEL_TEXT
 
-from api.attendance_taker import input_list, edit_list, setting_user_status, do_nothing, summary, change_status
+from api.attendance_taker import *
 from api.util import CustomContext, WebhookUpdate, routes
 
 # Enable logging
@@ -292,12 +292,8 @@ async def handle_delete_poll_callback(update: Update, context: CustomContext) ->
       await update.callback_query.answer()
 
 async def attendance(update: Update, context: CustomContext) -> int:
-    text = "Hi! Please click 'New List' to input a new list."
-    reply_keyboard = [["New List"]]
-    if "dct" in context.user_data:
-        reply_keyboard[0].append("Continue List")
-        text = "Hi! Please click 'New List' to input a new list or 'Continue List' to edit the existing list."
-    await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+    text = "Hi! Enter /new_list to create a new attendance list or /view_lists to manage existing lists."
+    await update.message.reply_text(text)
     return routes["SELECT_NEW_OR_CONTINUE"]
 
 async def cancel(update: Update, context: CustomContext) -> int:
@@ -349,17 +345,12 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
 # register handlers
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start), CommandHandler("attendance", attendance),
-                  CommandHandler("new_poll", create_new_poll), CommandHandler("summary", summary),
+                  CommandHandler("new_poll", create_new_poll),
                   CommandHandler("info", get_info), CommandHandler("polls", get_polls),
                   CommandHandler("cancel", cancel)],
     states={
-        routes["SELECT_NEW_OR_CONTINUE"]: [MessageHandler(filters.Regex("^New List$"), input_list),
-                                  MessageHandler(filters.Regex("^Continue List$"), edit_list)],
-        routes["INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_list)],
-        routes["EDIT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_list),
-                        CallbackQueryHandler(change_status, pattern="^\d+$"),
-                        CallbackQueryHandler(do_nothing, pattern="^.$")],
-        routes["SETTING_STATUS"]: [CallbackQueryHandler(setting_user_status, pattern="^(?!\d+$).+")],
+        routes["SELECT_NEW_OR_CONTINUE"]: [CommandHandler("new_list", request_attendance_list), CommandHandler("view_lists", get_lists)],
+        routes["INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, request_attendance_list)],
         routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
         routes["GET_TITLE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
@@ -367,17 +358,32 @@ conv_handler = ConversationHandler(
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],
         routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(poll_title_clicked_callback, pattern="^.+$")],
         routes["GET_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_poll_name)],
+        routes["RECEIVE_INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_inputted_attendance_list)],
+        routes["VIEW_LIST"]: [CallbackQueryHandler(handle_view_attendance_list, pattern="^va_")],
     },
     fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
 )
+
+attendance_taking_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(change_status, pattern=MARK_ATTENDANCE_REGEX_STRING),
+                  CallbackQueryHandler(do_nothing, pattern="^.$"),
+                  CommandHandler("summary", summary)],
+    states={
+        routes["SETTING_STATUS"]: [CallbackQueryHandler(setting_user_status, pattern="^(?!\d+$).+")],
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)
+
 # Always-active request handlers
 application.add_handler(InlineQueryHandler(forward_poll))
 application.add_handler(CallbackQueryHandler(handle_poll_voting_callback, pattern="^p_"))
 application.add_handler(CallbackQueryHandler(handle_update_results_callback, pattern="^u_"))
 application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern="^d_"))
+application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern="^s_"))
 
 # Transient conversation handler 
 application.add_handler(conv_handler)
+application.add_handler(attendance_taking_conv_handler)
 
 # Misc handlers
 application.add_handler(TypeHandler(type=WebhookUpdate, callback=webhook_update))

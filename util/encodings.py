@@ -53,3 +53,26 @@ def encode_poll_voting(poll_id: int, poll_type: str, index: int) -> str:
 def decode_poll_voting_callback(query: str) -> tuple:
     poll_type, poll_id, index = query.split("_")[1:]
     return poll_id, poll_type, int(index)
+
+# View attendance lists
+def encode_view_attendance_list(a_l_id: str) -> str:
+    return "va_" + a_l_id
+
+def decode_view_attendance_list(encoded: str) -> str:
+    return encoded.split("_")[1]
+
+# Mark attendance
+MARK_ATTENDANCE_REGEX_STRING = "^a_"
+def encode_mark_attendance(user_id: str, a_l_id: str) -> str:
+    return "a_" + user_id + "_" + a_l_id
+
+def decode_mark_attendance(encoded: str) -> tuple:
+    return encoded.split("_")[1:]
+
+# View summary
+VIEW_SUMMARY_REGEX_STRING = "^s_"
+def encode_view_attendance_summary(a_l_id: str) -> str:
+    return "s_" + a_l_id
+
+def decode_view_attendance_summary(encoded: str) -> str:
+    return encoded.split("_")[1]
