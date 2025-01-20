@@ -130,7 +130,7 @@ async def get_title(update: Update, context: CustomContext) -> int:
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025, 10:30)")
+    await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025,10:30)")
     return routes["GET_START_TIME"]
 
 # TODO: handle invalid input
@@ -145,7 +145,7 @@ async def get_start_time(update: Update, context: CustomContext) -> int:
         return routes["GET_START_TIME"]
 
     context.user_data["start_time"] = start_dt 
-    await update.message.reply_text("Please input the end time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025, 10:30)")
+    await update.message.reply_text("Please input the end time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025,10:30)")
 
     return routes["GET_END_TIME"]
 
