@@ -62,12 +62,12 @@ def decode_view_attendance_list(encoded: str) -> str:
     return encoded.split("_")[1]
 
 # Mark attendance
-MARK_ATTENDANCE_REGEX_STRING = "^a_"
+MARK_ATTENDANCE_REGEX_STRING = "^a,"
 def encode_mark_attendance(user_id: str, a_l_id: str) -> str:
-    return "a_" + user_id + "_" + a_l_id
+    return "a," + user_id + "," + a_l_id
 
 def decode_mark_attendance(encoded: str) -> tuple:
-    return encoded.split("_")[1:]
+    return encoded.split(",")[1:]
 
 # View summary
 VIEW_SUMMARY_REGEX_STRING = "^s_"

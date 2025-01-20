@@ -43,14 +43,18 @@ async def get_lists(update: Update, context: CustomContext) -> int:
         await update.message.reply_text("You have no attendance list yet.")
         return ConversationHandler.END
     inlinekeyboard = generate_inline_keyboard_for_attendance_lists(attendance_lists)
-    await update.message.reply_text("Please select the attendance list you want to edit\.", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
+    await update.message.reply_text("Please select the attendance list you want to edit.", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
     return routes["VIEW_LIST"]
 
 async def handle_view_attendance_list(update: Update, context: CustomContext) -> int:
     attendance_list_id = decode_view_attendance_list(update.callback_query.data)
     attendance_list = get_attendance_list(attendance_list_id)
     await update.callback_query.answer()
-    display_edit_list(attendance_list, update)
+    summary_text = attendance_list.generate_summary_text()
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
+    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
+                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
+                                    parse_mode="MarkdownV2")
     return ConversationHandler.END
 
 async def request_attendance_list(update: Update, context: CustomContext) -> int:
@@ -68,7 +72,7 @@ async def process_inputted_attendance_list(update: Update, context: CustomContex
       await update.message.reply_text("Invalid list format. Please input the list again.")
       logger.info(e)
       return routes["RECEIVE_INPUT_LIST"]
-    display_edit_list(attendance_list, update)
+    await display_edit_list(attendance_list, update)
     return ConversationHandler.END
 
 async def display_edit_list(attendance_list: AttendanceList, update: Update) -> None:
@@ -81,13 +85,14 @@ async def display_edit_list(attendance_list: AttendanceList, update: Update) -> 
 def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList) -> list:
     inlinekeyboard = []
     DO_NOTHING = "."
-    inlinekeyboard.append([InlineKeyboardButton("NON REGULARS", callback_data=DO_NOTHING)])
     lists = [attendance_list.non_regulars, attendance_list.regulars, attendance_list.standins]
     titles = ["NON REGULARS", "REGULARS", "STANDINS"]
     for index, lst in enumerate(lists):
-        inlinekeyboard.append([InlineKeyboardButton(titles[index], callback_data=DO_NOTHING)])
+        if len(lst) > 0:
+          inlinekeyboard.append([InlineKeyboardButton(titles[index], callback_data=DO_NOTHING)])
         for index, person in enumerate(lst):
-            callback_data = encode_mark_attendance(callback_data, attendance_list.id)
+            # print(person)
+            callback_data = encode_mark_attendance(person["id"], attendance_list.id)
             inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {person['name']}", callback_data=callback_data)])
     return inlinekeyboard
 
@@ -99,7 +104,7 @@ async def summary(update: Update, context: CustomContext) -> int:
         await update.message.reply_text("You have no attendance list yet.")
         return ConversationHandler.END
     keyboard = generate_inline_keyboard_for_attendance_summaries(attendance_lists)
-    await update.message.reply_text("Please select the attendance list you want to view the summary of\.", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text("Please select the attendance list you want to view the summary of.", reply_markup=InlineKeyboardMarkup(keyboard))
     return ConversationHandler.END
 
 async def handle_view_attendance_summary(update: Update, context: CustomContext) -> int:
@@ -144,12 +149,12 @@ async def setting_user_status(update: Update, context: CustomContext) -> None:
     user_id = selected_user["id"]
     attendance_list = AttendanceList.from_dict(user_data["dct"])
     attendance_list.update_user_status(user_id, int(new_value))
-    update_attendance_list(attendance_list)
+    update_attendance_list(attendance_list.id, attendance_list)
     logger.info("User %s selected %s", user.first_name, new_value)
     await update.callback_query.answer()
     summary_text = attendance_list.generate_summary_text()
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
+    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
     return ConversationHandler.END
