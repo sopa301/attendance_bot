@@ -140,7 +140,7 @@ async def get_title(update: Update, context: CustomContext) -> int:
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025, 10:30) Hello")
+    await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025, 10:30)")
     return routes["GET_START_TIME"]
 
 # TODO: handle invalid input
@@ -155,7 +155,8 @@ async def get_start_time(update: Update, context: CustomContext) -> int:
         return routes["GET_START_TIME"]
 
     context.user_data["start_time"] = start_dt 
-    await update.message.reply_text("Please input the end time of the poll.")
+    await update.message.reply_text("Please input the end time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025, 10:30)")
+
     return routes["GET_END_TIME"]
 
 def get_poll_group_inline_keyboard(poll_id: str) -> list:
@@ -170,7 +171,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     status = Status()
     et = parse_dt_to_iso(end_time, status)
 
-    if compare_time(context.user_data["start_time"], et) < 0:
+    if compare_time(context.user_data["start_time"], et) > 0:
         await update.message.reply_text(f"Unsuccessful: end time given is before start time. Please input end time again")
         return routes["GET_END_TIME"]
 
