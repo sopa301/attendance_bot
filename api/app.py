@@ -27,10 +27,11 @@ from telegram.ext import (
 
 import traceback
 
-from util.objects import AttendanceList, PollGroup, EventPoll
+from util.objects import AttendanceList, PollGroup, EventPoll, Status
 from util import import_env
 from util.db import *
 from util.texts import INFO_TEXT
+from util.helper import parse_dt_to_iso, compare_time
 
 from api.attendance_taker import input_list, edit_list, setting_user_status, do_nothing, summary, change_status
 from api.util import CustomContext, WebhookUpdate, routes
@@ -139,13 +140,21 @@ async def get_title(update: Update, context: CustomContext) -> int:
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Please input the start time of the poll.")
+    await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025, 10:30) Hello")
     return routes["GET_START_TIME"]
 
 # TODO: handle invalid input
 async def get_start_time(update: Update, context: CustomContext) -> int:
     start_time = update.message.text
-    context.user_data["start_time"] = start_time
+    
+    status = Status()
+    start_dt = parse_dt_to_iso(start_time, status)
+    
+    if not status.status:
+        await update.message.reply_text(f"Unsuccessful: {status.message}. Please input start time again")
+        return routes["GET_START_TIME"]
+
+    context.user_data["start_time"] = start_dt 
     await update.message.reply_text("Please input the end time of the poll.")
     return routes["GET_END_TIME"]
 
@@ -158,8 +167,19 @@ def get_poll_group_inline_keyboard(poll_id: str) -> list:
 # TODO: handle invalid input, logic to loop back for multiple events
 async def get_end_time(update: Update, context: CustomContext) -> int:
     end_time = update.message.text
+    status = Status()
+    et = parse_dt_to_iso(end_time, status)
+
+    if compare_time(context.user_data["start_time"], et) < 0:
+        await update.message.reply_text(f"Unsuccessful: end time given is before start time. Please input end time again")
+        return routes["GET_END_TIME"]
+
+    if not status.status:
+        await update.message.reply_text(f"Unsuccessful: {status.message}. Please input end time again")
+        return routes["GET_END_TIME"]
+
     user_id = update.message.from_user.id
-    context.user_data["end_time"] = end_time
+    context.user_data["end_time"] = et 
     poll = EventPoll(context.user_data["start_time"], context.user_data["end_time"], context.user_data["title"], context.user_data["details"], [12, 12])
     context.user_data["polls"].append(poll.to_dict())
 
@@ -191,7 +211,11 @@ def generate_poll_group_text(poll_group: PollGroup, poll_type) -> str:
     polls = get_event_polls(poll_group.get_poll_ids())
     poll_body = [poll_group.name + "\n"]
     for i, poll in enumerate(polls):
-        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{poll.start_time} - {poll.end_time}\n")
+        st = EventPoll.format_iso_for_user(poll.start_time)
+        et = EventPoll.format_iso_for_user(poll.end_time)
+        print("st: " + st)
+        print("et: " + et)
+        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{st} - {et}\n")
         if poll_type == "nr":
             lst = poll.non_regulars
         elif poll_type == "r":
