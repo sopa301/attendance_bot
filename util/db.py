@@ -2,12 +2,13 @@ from pymongo import MongoClient
 from bson import ObjectId
 from util.objects import AttendanceList, EventPoll, PollGroup
 from util import import_env
+import certifi
 
 env_vars = ["MONGO_URL", "MONGO_DB_NAME", "MONGO_COLLECTION_NAME"]
 env_config = import_env(env_vars)
 
 # MongoDB configuration
-client = MongoClient(env_config["MONGO_URL"])
+client = MongoClient(env_config["MONGO_URL"]+certifi.where())
 db = client[env_config["MONGO_DB_NAME"]]
 
 # Collections

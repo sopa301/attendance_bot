@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import datetime
 
 from util.texts import escape_markdown_characters, generate_status_string, ABSENT
 
@@ -37,6 +38,11 @@ class EventPoll():
       "poll_group_id": self.poll_group_id
     }
   
+  @staticmethod
+  def format_iso_for_user(iso_dt: str):
+    dt = datetime.fromisoformat(iso_dt)
+    return dt.strftime("%d %B %y, %-I%p").lower()
+
   @staticmethod
   def from_dict(dct):
     poll = EventPoll(dct["start_time"], dct["end_time"], dct["title"], dct["details"], dct["allocations"])
@@ -92,7 +98,11 @@ class PollGroup():
   def generate_poll_group_text(self, polls: list, membership: str) -> str:
     poll_body = [self.name + "\n"]
     for i, poll in enumerate(polls):
-        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{poll.start_time} - {poll.end_time}\n")
+        st = EventPoll.format_iso_for_user(poll.start_time)
+        et = EventPoll.format_iso_for_user(poll.end_time)
+        print("st: " + st)
+        print("et: " + et)
+        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{st} - {et}\n")
         if membership == "nr":
             lst = poll.non_regulars
         elif membership == "r":
@@ -241,3 +251,15 @@ class AttendanceList():
     attendance_list.details = [poll.title, poll.details]
     attendance_list.non_regulars = [{"name": person, "status": ABSENT, "id": i, "membership": "nr"} for i, person in enumerate(poll.people)]
     return attendance_list
+
+# Indicate if function has executed - else message to return to user stored
+class Status():
+  def __init__(self):
+    self.status = False 
+    self.message = ""
+
+  def set_message(self, message):
+    self.message = message
+  
+  def set_success(self):
+    self.status = True
