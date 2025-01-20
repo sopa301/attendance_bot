@@ -154,7 +154,7 @@ async def setting_user_status(update: Update, context: CustomContext) -> None:
     await update.callback_query.answer()
     summary_text = attendance_list.generate_summary_text()
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit.",
+    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
     return ConversationHandler.END
