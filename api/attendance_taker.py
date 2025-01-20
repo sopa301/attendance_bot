@@ -132,9 +132,9 @@ async def change_status(update: Update, context: CustomContext) -> None:
         f"Please select the attendance status of {selected_user['name']}",
         reply_markup=InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("Absent", callback_data=f"s{ABSENT}")],
-                [InlineKeyboardButton("Present", callback_data=f"s{PRESENT}")],
-                [InlineKeyboardButton("Last Minute Cancellation", callback_data=f"s{LAST_MINUTE_CANCELLATION}")],
+                [InlineKeyboardButton("Absent", callback_data=f"ss_{ABSENT}")],
+                [InlineKeyboardButton("Present", callback_data=f"ss_{PRESENT}")],
+                [InlineKeyboardButton("Last Minute Cancellation", callback_data=f"ss_{LAST_MINUTE_CANCELLATION}")],
             ]
         ),
     )
@@ -143,7 +143,7 @@ async def change_status(update: Update, context: CustomContext) -> None:
 async def setting_user_status(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     user_data = context.user_data
-    new_value = update.callback_query.data[1:]
+    new_value = update.callback_query.data[3:]
     selected_user = user_data["selected_user"]
     del user_data["selected_user"]
     user_id = selected_user["id"]

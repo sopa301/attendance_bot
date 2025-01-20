@@ -369,7 +369,7 @@ attendance_taking_conv_handler = ConversationHandler(
                   CallbackQueryHandler(do_nothing, pattern="^.$"),
                   CommandHandler("summary", summary)],
     states={
-        routes["SETTING_STATUS"]: [CallbackQueryHandler(setting_user_status, pattern="^(?!\d+$).+")],
+        routes["SETTING_STATUS"]: [CallbackQueryHandler(setting_user_status, pattern="^ss_")],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
