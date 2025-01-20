@@ -29,7 +29,7 @@ from mongopersistence import MongoPersistence
 from util.objects import AttendanceList
 from util import import_env
 from util.texts import ABSENT, PRESENT, LAST_MINUTE_CANCELLATION, \
-                      REQUEST_FOR_ATTENDANCE_LIST_INPUT
+                      REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT
 
 # Enable logging
 logging.basicConfig(
@@ -103,7 +103,7 @@ async def input_list(update: Update, context: CustomContext) -> int:
     if (message_text == "New List"):
         if "dct" in context.chat_data:
             del context.chat_data["dct"]
-        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT, reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     try:
       attendance_list = AttendanceList.parse_list(message_text)
@@ -121,7 +121,7 @@ async def edit_list(update: Update, context: CustomContext) -> int:
     logger.info("Displaying list for %s", user.first_name)
     if ("dct" not in context.chat_data):
         await update.message.reply_text("You have no list yet. Please input the list first.")
-        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT, reply_markup=ReplyKeyboardRemove())
         return INPUT_LIST
     await display_edit_list(AttendanceList.from_dict(context.chat_data["dct"]), update)
     return EDIT_LIST

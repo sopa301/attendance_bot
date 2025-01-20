@@ -91,6 +91,29 @@ class PollGroup():
     group.polls_ids = dct["polls_ids"]
     group.number_of_distinct_groups = 2
     return group
+  
+  def generate_overview_text(self, polls: list) -> str:
+    return "Non Regulars:\n" + self.generate_poll_group_text(polls, "nr") + "\n\nRegulars\n" + self.generate_poll_group_text(polls, "r")
+
+  def generate_poll_group_text(self, polls: list, membership: str) -> str:
+    poll_body = [self.name + "\n"]
+    for i, poll in enumerate(polls):
+        st = EventPoll.format_iso_for_user(poll.start_time)
+        et = EventPoll.format_iso_for_user(poll.end_time)
+        print("st: " + st)
+        print("et: " + et)
+        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{st} - {et}\n")
+        if membership == "nr":
+            lst = poll.non_regulars
+        elif membership == "r":
+            lst = poll.regulars
+        else:
+            raise ValueError("Invalid poll type: " + membership)
+        for j, person in enumerate(lst):
+            poll_body.append(f"{j+1}. {person}")
+        poll_body.append("\n")
+    poll_body = "\n".join(poll_body)
+    return poll_body
 
 class AttendanceList():
   def __init__(self):
