@@ -20,6 +20,9 @@ ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 
 PRESENT_SYMBOL = "✅"
 ABSENT_SYMBOL = "❌"
+CANCELLATION_SYMBOL = "🚫"
+
+status_map = [ABSENT_SYMBOL, PRESENT_SYMBOL, CANCELLATION_SYMBOL]
 
 def generate_status_string(status: int, name: str, index: int) -> str:
     if status == ABSENT:

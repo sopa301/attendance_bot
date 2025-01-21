@@ -121,10 +121,11 @@ def remove_person_from_event_poll(poll_id, username, field):
     )
 
 # TODO: Make this function more efficient
-def update_attendance_list(attendance_id, attendance_list):
+def update_attendance_list(attendance_id, attendance_list, user_id, new_status):
+    category, index = attendance_list.get_category_and_index(user_id)
     return attendance_collection.update_one(
       {"_id": ObjectId(attendance_id)},
-      {"$set": attendance_list.to_dict()}
+      {"$set": {f"{category}.{index}.status": new_status}}
     )
 
 # Delete functions

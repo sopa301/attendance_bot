@@ -345,7 +345,7 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
 # register handlers
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start), CommandHandler("attendance", attendance),
-                  CommandHandler("new_poll", create_new_poll),
+                  CommandHandler("new_poll", create_new_poll), CommandHandler("summary", summary),
                   CommandHandler("info", get_info), CommandHandler("polls", get_polls),
                   CommandHandler("cancel", cancel)],
     states={
@@ -359,31 +359,23 @@ conv_handler = ConversationHandler(
         routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(poll_title_clicked_callback, pattern="^.+$")],
         routes["GET_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_poll_name)],
         routes["RECEIVE_INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_inputted_attendance_list)],
-        routes["VIEW_LIST"]: [CallbackQueryHandler(handle_view_attendance_list, pattern="^va_")],
+        routes["VIEW_LIST"]: [CallbackQueryHandler(handle_view_attendance_list, pattern=VIEW_ATTENDANCE_LISTS_REGEX_STRING)],
     },
     fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
 )
 
-attendance_taking_conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(change_status, pattern=MARK_ATTENDANCE_REGEX_STRING),
-                  CallbackQueryHandler(do_nothing, pattern="^.$"),
-                  CommandHandler("summary", summary)],
-    states={
-        routes["SETTING_STATUS"]: [CallbackQueryHandler(setting_user_status, pattern="^ss_")],
-    },
-    fallbacks=[CommandHandler("cancel", cancel)],
-)
-
 # Always-active request handlers
 application.add_handler(InlineQueryHandler(forward_poll))
-application.add_handler(CallbackQueryHandler(handle_poll_voting_callback, pattern="^p_"))
-application.add_handler(CallbackQueryHandler(handle_update_results_callback, pattern="^u_"))
-application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern="^d_"))
-application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern="^s_"))
+application.add_handler(CallbackQueryHandler(handle_poll_voting_callback, pattern=POLL_VOTING_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(handle_update_results_callback, pattern=UPDATE_POLL_RESULTS_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern=DELETE_POLL_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern=VIEW_SUMMARY_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(change_status, pattern=MARK_ATTENDANCE_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(do_nothing, pattern="^.$"))
 
 # Transient conversation handler 
 application.add_handler(conv_handler)
-application.add_handler(attendance_taking_conv_handler)
+
 
 # Misc handlers
 application.add_handler(TypeHandler(type=WebhookUpdate, callback=webhook_update))

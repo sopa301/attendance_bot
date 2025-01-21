@@ -139,7 +139,7 @@ class AttendanceList():
       "standins": self.standins
     }
   
-  def find_user_by_id(self, id: int):
+  def find_user_by_id(self, id: str):
     for user in self.non_regulars:
       if user["id"] == id:
         return user
@@ -150,6 +150,18 @@ class AttendanceList():
       if user["id"] == id:
         return user
     raise ValueError("User not found with id: " + str(id))
+  
+  def get_category_and_index(self, user_id):
+    for user in self.non_regulars:
+      if user["id"] == user_id:
+        return "non_regulars", self.non_regulars.index(user)
+    for user in self.regulars:
+      if user["id"] == user_id:
+        return "regulars", self.regulars.index(user)
+    for user in self.standins:
+      if user["id"] == user_id:
+        return "standins", self.standins.index(user)
+    raise ValueError("User not found with id: " + str(user_id))
   
   def update_user_status(self, id: int, status: int):
     user = self.find_user_by_id(id)

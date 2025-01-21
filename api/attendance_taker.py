@@ -5,7 +5,16 @@ from telegram.ext import (
 import logging
 
 from util.objects import AttendanceList
-from util.texts import ABSENT, PRESENT, LAST_MINUTE_CANCELLATION, REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT
+from util.texts import (
+  ABSENT,
+  PRESENT,
+  LAST_MINUTE_CANCELLATION,
+  REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT,
+  ABSENT_SYMBOL,
+  PRESENT_SYMBOL,
+  CANCELLATION_SYMBOL,
+  status_map
+)
 from util.db import *
 from util.encodings import *
 
@@ -52,7 +61,7 @@ async def handle_view_attendance_list(update: Update, context: CustomContext) ->
     await update.callback_query.answer()
     summary_text = attendance_list.generate_summary_text()
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
+    await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
     return ConversationHandler.END
@@ -91,9 +100,13 @@ def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList)
         if len(lst) > 0:
           inlinekeyboard.append([InlineKeyboardButton(titles[index], callback_data=DO_NOTHING)])
         for index, person in enumerate(lst):
-            # print(person)
-            callback_data = encode_mark_attendance(person["id"], attendance_list.id)
-            inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {person['name']}", callback_data=callback_data)])
+            inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {status_map[person['status']]} {person['name']}", callback_data=DO_NOTHING)])
+            inline_list = [
+                InlineKeyboardButton(PRESENT_SYMBOL, callback_data=encode_mark_attendance(person["id"], attendance_list.id, PRESENT)),
+                InlineKeyboardButton(ABSENT_SYMBOL, callback_data=encode_mark_attendance(person["id"], attendance_list.id, ABSENT)),
+                InlineKeyboardButton(CANCELLATION_SYMBOL, callback_data=encode_mark_attendance(person["id"], attendance_list.id, LAST_MINUTE_CANCELLATION))
+            ]
+            inlinekeyboard.append(inline_list)
     return inlinekeyboard
 
 async def summary(update: Update, context: CustomContext) -> int:
@@ -118,43 +131,16 @@ async def handle_view_attendance_summary(update: Update, context: CustomContext)
 async def change_status(update: Update, context: CustomContext) -> None:
     """Handles the attendance status of the user."""
     user = update.callback_query.from_user
-    user_data = context.user_data
-    user_id, attendance_list_id = decode_mark_attendance(update.callback_query.data)
+    user_id, attendance_list_id, new_status = decode_mark_attendance(update.callback_query.data)
     attendance_list = get_attendance_list(attendance_list_id)
-    user_data["selected_id"] = user_id
-    selected_user = attendance_list.find_user_by_id(user_data["selected_id"])
-    user_data["dct"] = attendance_list.to_dict()
-    del user_data["selected_id"]
-    user_data["selected_user"] = selected_user
-    logger.info("User %s selected %s with id %s", user.first_name, selected_user["name"], selected_user["id"])
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text(
-        f"Please select the attendance status of {selected_user['name']}",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("Absent", callback_data=f"ss_{ABSENT}")],
-                [InlineKeyboardButton("Present", callback_data=f"ss_{PRESENT}")],
-                [InlineKeyboardButton("Last Minute Cancellation", callback_data=f"ss_{LAST_MINUTE_CANCELLATION}")],
-            ]
-        ),
-    )
-    return routes["SETTING_STATUS"]
-
-async def setting_user_status(update: Update, context: CustomContext) -> None:
-    user = update.callback_query.from_user
-    user_data = context.user_data
-    new_value = update.callback_query.data[3:]
-    selected_user = user_data["selected_user"]
-    del user_data["selected_user"]
-    user_id = selected_user["id"]
-    attendance_list = AttendanceList.from_dict(user_data["dct"])
-    attendance_list.update_user_status(user_id, int(new_value))
-    update_attendance_list(attendance_list.id, attendance_list)
-    logger.info("User %s selected %s", user.first_name, new_value)
+    selected_user = attendance_list.find_user_by_id(user_id)
+    attendance_list.update_user_status(user_id, new_status)
+    update_attendance_list(attendance_list.id, attendance_list, user_id, new_status)
+    logger.info("User %s selected %s with id %s, set to %s", user.first_name, selected_user["name"], selected_user["id"], selected_user["status"])
     await update.callback_query.answer()
     summary_text = attendance_list.generate_summary_text()
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
+    await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
                                     reply_markup=InlineKeyboardMarkup(inlinekeyboard),
                                     parse_mode="MarkdownV2")
     return ConversationHandler.END
