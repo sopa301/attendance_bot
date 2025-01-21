@@ -32,7 +32,7 @@ from util import import_env
 from util.db import *
 from util.helper import parse_dt_to_iso, compare_time
 from util.encodings import *
-from util.texts import INFO_TEXT, START_TEXT, CANCEL_TEXT
+from util.texts import INFO_TEXT, START_TEXT, CANCEL_TEXT, ATTENDANCE_MENU_TEXT
 
 from api.attendance_taker import *
 from api.util import CustomContext, WebhookUpdate, routes
@@ -119,21 +119,18 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
         await update.message.reply_text("Please input a valid number.")
         return routes["GET_NUMBER_OF_EVENTS"]
 
-# TODO: handle invalid input
 async def get_title(update: Update, context: CustomContext) -> int:
     title = update.message.text
     context.user_data["title"] = title
     await update.message.reply_text("Please input the details of the event.")
     return routes["GET_DETAILS"]
 
-# TODO: handle invalid input
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
     await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025,10:30)")
     return routes["GET_START_TIME"]
 
-# TODO: handle invalid input
 async def get_start_time(update: Update, context: CustomContext) -> int:
     start_time = update.message.text
     
@@ -155,7 +152,7 @@ def get_poll_group_inline_keyboard(poll_id: str) -> list:
             [InlineKeyboardButton("Update Results", callback_data=encode_update_poll_results(poll_id))], 
             [InlineKeyboardButton("Delete Poll", callback_data=encode_delete_poll(poll_id))]]
 
-# TODO: handle invalid input, logic to loop back for multiple events
+# TODO: handle logic to loop back for multiple events
 async def get_end_time(update: Update, context: CustomContext) -> int:
     end_time = update.message.text
     status = Status()
@@ -247,7 +244,7 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
     query = update.callback_query.data
     poll_id, poll_type, _ = decode_poll_voting_callback(query)
     poll = get_event_poll(poll_id)
-    username = user.username
+    username = f"@{user.username}"
     toggle_person_in_event(poll_id, poll, username, poll_type)
     poll_group = get_poll_group(poll.poll_group_id)
     polls = get_event_polls(poll_group.get_poll_ids())
@@ -293,8 +290,8 @@ async def handle_delete_poll_callback(update: Update, context: CustomContext) ->
       await update.callback_query.answer()
 
 async def attendance(update: Update, context: CustomContext) -> int:
-    text = "Hi! Enter /new_list to create a new attendance list or /view_lists to manage existing lists."
-    await update.message.reply_text(text)
+    await update.message.reply_text(ATTENDANCE_MENU_TEXT)
+    logger.info("User %s requested to manage attendance.", update.message.from_user.first_name)
     return routes["SELECT_NEW_OR_CONTINUE"]
 
 async def cancel(update: Update, context: CustomContext) -> int:
@@ -347,8 +344,7 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start),
                   CommandHandler("new_poll", create_new_poll),
-                  CommandHandler("info", get_info), CommandHandler("polls", get_polls),
-                  CommandHandler("cancel", cancel)],
+                  CommandHandler("info", get_info), CommandHandler("polls", get_polls)],
     states={
         routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
         routes["GET_TITLE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
@@ -358,20 +354,24 @@ conv_handler = ConversationHandler(
         routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(poll_title_clicked_callback, pattern="^.+$")],
         routes["GET_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_poll_name)],
     },
-    fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
+    fallbacks=[CommandHandler("cancel", cancel)],
 )
 
 attendance_conv_handler = ConversationHandler(
     entry_points=[CommandHandler("attendance", attendance), CommandHandler("summary", summary)],
     states={
-        routes["SELECT_NEW_OR_CONTINUE"]: [CommandHandler("new_list", request_attendance_list), CommandHandler("view_lists", get_lists)],
+        routes["SELECT_NEW_OR_CONTINUE"]: [CommandHandler("new_list", request_attendance_list),
+                                           CommandHandler("view_lists", get_lists),
+                                           CommandHandler("import_from_poll", import_from_poll)],
         routes["MANAGE_ATTENDANCE_LIST"]: [CallbackQueryHandler(handle_manage_attendance_list, pattern=MANAGE_ATTENDANCE_LIST_REGEX_STRING)],
         routes["RECEIVE_INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_inputted_attendance_list)],
         routes["VIEW_LIST"]: [CallbackQueryHandler(handle_view_attendance_list, pattern=VIEW_ATTENDANCE_LISTS_REGEX_STRING)],
         routes["INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, request_attendance_list)],
         routes["RECEIVE_EDITED_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_edited_attendance_list)],
+        routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(handle_select_poll_group)],
+        routes["SELECT_POLL"]: [CallbackQueryHandler(handle_select_poll)],
     },
-    fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
+    fallbacks=[CommandHandler("cancel", cancel)],
 )
 
 # Always-active request handlers

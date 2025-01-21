@@ -41,7 +41,7 @@ class EventPoll():
   @staticmethod
   def format_iso_for_user(iso_dt: str):
     dt = datetime.fromisoformat(iso_dt)
-    return dt.strftime("%d %B %y, %-I%p").lower()
+    return dt.strftime("%d %B %y, %I:%M%p").lower().lstrip('0')
 
   @staticmethod
   def from_dict(dct):
@@ -290,6 +290,19 @@ class AttendanceList():
 
   def insert_id(self, id):
     self.id = id
+
+  @staticmethod
+  def from_poll(poll: EventPoll):
+    attendance_list = AttendanceList()
+    attendance_list.details = [poll.title, poll.details]
+    attendance_list.regulars = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "r"}, poll.regulars))[:poll.allocations[1]]
+    num_regulars = len(attendance_list.regulars)
+    attendance_list.non_regulars = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "nr"}, poll.non_regulars))
+    attendance_list.non_regulars = attendance_list.non_regulars[:max(poll.allocations[0], 24 - num_regulars)]
+    attendance_list.exco = []
+    attendance_list.standins = []
+
+    return attendance_list
 
 # Indicate if function has executed - else message to return to user stored
 class Status():

@@ -3,7 +3,13 @@ from bson import ObjectId
 from util.objects import AttendanceList, EventPoll, PollGroup
 from util import import_env
 
-env_vars = ["MONGO_URL", "MONGO_DB_NAME", "MONGO_COLLECTION_NAME"]
+env_vars = [
+  "MONGO_URL",
+  "MONGO_DB_NAME",
+  "MONGO_POLLS_COLLECTION_NAME",
+  "MONGO_GROUPS_COLLECTION_NAME",
+  "MONGO_ATTENANCES_COLLECTION_NAME"
+]
 env_config = import_env(env_vars)
 
 # MongoDB configuration
@@ -11,9 +17,9 @@ client = MongoClient(env_config["MONGO_URL"])
 db = client[env_config["MONGO_DB_NAME"]]
 
 # Collections
-polls_collection = db[env_config["MONGO_COLLECTION_NAME"]]
-groups_collection = db[env_config["MONGO_COLLECTION_NAME"]]
-attendance_collection = db[env_config["MONGO_COLLECTION_NAME"]]
+polls_collection = db[env_config["MONGO_POLLS_COLLECTION_NAME"]]
+groups_collection = db[env_config["MONGO_GROUPS_COLLECTION_NAME"]]
+attendance_collection = db[env_config["MONGO_ATTENANCES_COLLECTION_NAME"]]
 
 # Custom error for when objects are not found
 class PollNotFoundError(Exception):
@@ -96,6 +102,7 @@ def get_attendance_list(attendance_id):
 
 def get_attendance_lists_by_owner_id(owner_id):
     attendance_jsons = list(attendance_collection.find({"owner_id": owner_id}))
+    print(attendance_jsons)
     attendance_lists = list(map(lambda x: AttendanceList.from_dict(x), attendance_jsons))
     for i, attendance in enumerate(attendance_lists):
         attendance.insert_id(attendance_jsons[i]["_id"].__str__())
@@ -127,7 +134,7 @@ def update_attendance_list(attendance_id, attendance_list, user_id, new_status):
       {"$set": {f"{category}.{index}.status": new_status}}
     )
 
-def update_attendance_list(attendance_id, attendance_list):
+def update_attendance_list_full(attendance_id, attendance_list):
     return attendance_collection.update_one(
       {"_id": ObjectId(attendance_id)},
       {"$set": attendance_list.to_dict()}

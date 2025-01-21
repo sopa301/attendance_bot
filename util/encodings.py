@@ -88,3 +88,19 @@ def decode_manage_attendance_list(encoded: str) -> str:
 
 def encode_manage_attendance_list(s: str) -> str:
     return "ma," + s
+
+# # Select poll group for managing attendance
+# SELECT_POLL_GROUP_MANAGE_REGEX_STRING = "^pgm,"
+# def encode_select_poll_group_manage(group_id: str) -> str:
+#     return "pgm," + group_id
+
+# def decode_select_poll_group_manage(encoded: str) -> str:
+#     return encoded.split(",")[1]
+
+# # Select poll group for importing attendance list
+# SELECT_POLL_GROUP_IMPORT_REGEX_STRING = "^pgi,"
+# def encode_select_poll_group_import(group_id: str) -> str:
+#     return "pgi," + group_id
+
+# def decode_select_poll_group_import(encoded: str) -> str:
+#     return encoded.split(",")[1]

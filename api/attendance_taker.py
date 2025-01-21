@@ -55,6 +55,50 @@ async def get_lists(update: Update, context: CustomContext) -> int:
     await update.message.reply_text("Please select the attendance list you want to edit.", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
     return routes["VIEW_LIST"]
 
+async def import_from_poll(update: Update, context: CustomContext) -> int:
+    """Imports the attendance list from a poll."""
+    user = update.message.from_user
+    logger.info("User %s requested to import from a poll.", user.first_name)
+    keyboard = []
+    poll_groups = get_poll_groups_by_owner_id(user.id)
+    if len(poll_groups) == 0:
+        await update.message.reply_text("You have no poll group yet.")
+        return ConversationHandler.END
+    for poll_group in poll_groups:
+        keyboard.append([InlineKeyboardButton(poll_group.name, callback_data=poll_group.id)])
+    await update.message.reply_text("Please select the poll group you want to import from.", reply_markup=InlineKeyboardMarkup(keyboard))
+    return routes["SELECT_POLL_GROUP"]
+
+async def handle_select_poll_group(update: Update, context: CustomContext) -> int:
+    poll_group_id = update.callback_query.data
+    try:
+      poll_group = get_poll_group(poll_group_id)
+      polls = get_event_polls(poll_group.get_poll_ids())
+    except PollGroupNotFoundError:
+      await update.callback_query.answer()
+      await update.callback_query.edit_message_text("Poll group not found.")
+      return ConversationHandler.END
+    keyboard = []
+    for poll in polls:
+        keyboard.append([InlineKeyboardButton(poll.title, callback_data=poll.id)])
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("Please select the poll you want to import from.", reply_markup=InlineKeyboardMarkup(keyboard))
+    return routes["SELECT_POLL"]
+
+async def handle_select_poll(update: Update, context: CustomContext) -> int:
+    poll_id = update.callback_query.data
+    poll = get_event_poll(poll_id)
+    attendance_list = AttendanceList.from_poll(poll)
+    attendance_list.insert_owner_id(update.callback_query.from_user.id)
+    attendance_list_id = insert_attendance_list(attendance_list)
+    attendance_list.insert_id(attendance_list_id)
+    summary_text = attendance_list.generate_summary_text()
+    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
+    await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
+                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
+                                    parse_mode="MarkdownV2")
+    return ConversationHandler.END
+
 async def handle_view_attendance_list(update: Update, context: CustomContext) -> int:
     attendance_list_id = decode_view_attendance_list(update.callback_query.data)
     attendance_list = get_attendance_list(attendance_list_id)
@@ -99,7 +143,7 @@ async def process_edited_attendance_list(update: Update, context: CustomContext)
       await update.message.reply_text("Invalid list format. Please input the list again.")
       logger.info(e)
       return routes["RECEIVE_EDITED_LIST"]
-    update_attendance_list(attendance_list.id, attendance_list)
+    update_attendance_list_full(attendance_list.id, attendance_list)
     await display_edit_list(attendance_list, update)
     return ConversationHandler.END
 
