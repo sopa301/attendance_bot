@@ -80,3 +80,11 @@ def encode_view_attendance_summary(a_l_id: str) -> str:
 
 def decode_view_attendance_summary(encoded: str) -> str:
     return encoded.split("_")[1]
+
+# Manage attendance list
+MANAGE_ATTENDANCE_LIST_REGEX_STRING = "^ma,"
+def decode_manage_attendance_list(encoded: str) -> str:
+    return encoded.split(",")[1]
+
+def encode_manage_attendance_list(s: str) -> str:
+    return "ma," + s

@@ -58,12 +58,49 @@ async def get_lists(update: Update, context: CustomContext) -> int:
 async def handle_view_attendance_list(update: Update, context: CustomContext) -> int:
     attendance_list_id = decode_view_attendance_list(update.callback_query.data)
     attendance_list = get_attendance_list(attendance_list_id)
+    context.user_data["attendance_list"] = attendance_list.to_dict()
     await update.callback_query.answer()
-    summary_text = attendance_list.generate_summary_text()
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
-                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
-                                    parse_mode="MarkdownV2")
+    inlinekeyboard = [
+        [InlineKeyboardButton("Take Attendance", callback_data=encode_manage_attendance_list("take_attendance"))],
+        [InlineKeyboardButton("Edit", callback_data=encode_manage_attendance_list("edit"))],
+        [InlineKeyboardButton("Delete", callback_data=encode_manage_attendance_list("delete"))]
+    ]
+    await update.callback_query.edit_message_text("What would you like to do?", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
+    return routes["MANAGE_ATTENDANCE_LIST"]
+
+async def handle_manage_attendance_list(update: Update, context: CustomContext) -> int:
+    attendance_list = AttendanceList.from_dict(context.user_data["attendance_list"])
+    command = decode_manage_attendance_list(update.callback_query.data)
+    if command == "take_attendance":
+      summary_text = attendance_list.generate_summary_text()
+      inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
+      await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
+                                      reply_markup=InlineKeyboardMarkup(inlinekeyboard),
+                                      parse_mode="MarkdownV2")
+      return ConversationHandler.END
+    elif command == "edit":
+        await update.callback_query.edit_message_text("Please copy and edit the list, then send it to me.")
+        await update.callback_query.message.reply_text(attendance_list.to_parsable_list())
+        return routes["RECEIVE_EDITED_LIST"]
+    elif command == "delete":
+        delete_attendance_list(attendance_list.id)
+        await update.callback_query.edit_message_text("Attendance list deleted.")
+        return ConversationHandler.END
+    else:
+        raise ValueError("Invalid command: " + command)
+
+async def process_edited_attendance_list(update: Update, context: CustomContext) -> int:
+    message_text = update.message.text
+    try:
+      attendance_list = AttendanceList.parse_list(message_text)
+      old_list = AttendanceList.from_dict(context.user_data["attendance_list"])
+      attendance_list.update_administrative_details(old_list)
+    except Exception as e:
+      await update.message.reply_text("Invalid list format. Please input the list again.")
+      logger.info(e)
+      return routes["RECEIVE_EDITED_LIST"]
+    update_attendance_list(attendance_list.id, attendance_list)
+    await display_edit_list(attendance_list, update)
     return ConversationHandler.END
 
 async def request_attendance_list(update: Update, context: CustomContext) -> int:

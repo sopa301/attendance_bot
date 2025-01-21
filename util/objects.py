@@ -125,6 +125,10 @@ class AttendanceList():
     self.exco = []
     self.standins = []
   
+  def update_administrative_details(self, old_list):
+    self.id = old_list.id
+    self.owner_id = old_list.owner_id
+
   def insert_owner_id(self, owner_id):
     self.owner_id = owner_id
 
@@ -203,6 +207,36 @@ class AttendanceList():
     attendance_list.exco = dct["exco"]
     attendance_list.standins = dct["standins"]
     return attendance_list
+
+  def to_parsable_list(self):
+    output_list = []
+    for line in self.details:
+        output_list.append(line)
+    output_list.append("")
+
+    output_list.append("Non regulars")
+    for i, tp in enumerate(self.non_regulars):
+      output_list.append(f"{i+1}. {tp['name']}")
+
+    output_list.append("")
+
+    output_list.append("Regulars")
+    for i, tp in enumerate(self.regulars):
+      output_list.append(f"{i+1}. {tp['name']}")
+
+    output_list.append("")
+
+    output_list.append("Standins")
+    for i, tp in enumerate(self.standins):
+      output_list.append(f"{i+1}. {tp['name']}")
+
+    output_list.append("")
+
+    output_list.append("Exco")
+    for i, tp in enumerate(self.exco):
+      output_list.append(tp)
+
+    return "\n".join(output_list)
 
   @staticmethod
   def parse_list(message_text: str):

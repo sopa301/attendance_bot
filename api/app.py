@@ -170,8 +170,10 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
         return routes["GET_END_TIME"]
 
     user_id = update.message.from_user.id
-    context.user_data["end_time"] = et 
-    poll = EventPoll(context.user_data["start_time"], context.user_data["end_time"], context.user_data["title"], context.user_data["details"], [12, 12])
+    st = context.user_data["start_time"]
+    title = context.user_data["title"]
+    details = context.user_data["details"]
+    poll = EventPoll(st, et, title, details, [12, 12])
     context.user_data["polls"].append(poll.to_dict())
 
     polls_jsons = context.user_data["polls"]
@@ -180,15 +182,14 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     poll_group.insert_poll_ids(polls_ids)
     poll_group_id = insert_poll_group(poll_group)
     update_poll_group_id(polls_ids, poll_group_id)
-    inline_keyboard = get_poll_group_inline_keyboard(poll_group_id)
 
+    inline_keyboard = get_poll_group_inline_keyboard(poll_group_id)
     await update.message.reply_text("Poll created.")
     await update.message.reply_text("Please click the button below to send the poll to another chat.",
                                     reply_markup=InlineKeyboardMarkup(inline_keyboard))
     del context.user_data["title"]
     del context.user_data["details"]
     del context.user_data["start_time"]
-    del context.user_data["end_time"]
     del context.user_data["poll_name"]
     del context.user_data["number_of_events"]
     del context.user_data["polls"]
@@ -246,7 +247,7 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
     query = update.callback_query.data
     poll_id, poll_type, _ = decode_poll_voting_callback(query)
     poll = get_event_poll(poll_id)
-    username = update.callback_query.from_user.username
+    username = user.username
     toggle_person_in_event(poll_id, poll, username, poll_type)
     poll_group = get_poll_group(poll.poll_group_id)
     polls = get_event_polls(poll_group.get_poll_ids())
@@ -322,7 +323,7 @@ async def error_handler(update: object, context: CustomContext) -> None:
         "</pre>\n\n"
         f"<pre>context.chat_data = {html.escape(str(context.chat_data))}</pre>\n\n"
         f"<pre>context.user_data = {html.escape(str(context.user_data))}</pre>\n\n"
-        f"<pre>{html.escape(tb_string)}</pre>"
+        # f"<pre>{html.escape(tb_string)}</pre>"
     )
 
     # Finally, send the message
@@ -344,13 +345,11 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
 
 # register handlers
 conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("start", start), CommandHandler("attendance", attendance),
-                  CommandHandler("new_poll", create_new_poll), CommandHandler("summary", summary),
+    entry_points=[CommandHandler("start", start),
+                  CommandHandler("new_poll", create_new_poll),
                   CommandHandler("info", get_info), CommandHandler("polls", get_polls),
                   CommandHandler("cancel", cancel)],
     states={
-        routes["SELECT_NEW_OR_CONTINUE"]: [CommandHandler("new_list", request_attendance_list), CommandHandler("view_lists", get_lists)],
-        routes["INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, request_attendance_list)],
         routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
         routes["GET_TITLE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
@@ -358,8 +357,19 @@ conv_handler = ConversationHandler(
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],
         routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(poll_title_clicked_callback, pattern="^.+$")],
         routes["GET_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_poll_name)],
+    },
+    fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
+)
+
+attendance_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("attendance", attendance), CommandHandler("summary", summary)],
+    states={
+        routes["SELECT_NEW_OR_CONTINUE"]: [CommandHandler("new_list", request_attendance_list), CommandHandler("view_lists", get_lists)],
+        routes["MANAGE_ATTENDANCE_LIST"]: [CallbackQueryHandler(handle_manage_attendance_list, pattern=MANAGE_ATTENDANCE_LIST_REGEX_STRING)],
         routes["RECEIVE_INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_inputted_attendance_list)],
         routes["VIEW_LIST"]: [CallbackQueryHandler(handle_view_attendance_list, pattern=VIEW_ATTENDANCE_LISTS_REGEX_STRING)],
+        routes["INPUT_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, request_attendance_list)],
+        routes["RECEIVE_EDITED_LIST"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_edited_attendance_list)],
     },
     fallbacks=[CommandHandler("cancel", cancel), CommandHandler("summary", summary)],
 )
@@ -375,6 +385,7 @@ application.add_handler(CallbackQueryHandler(do_nothing, pattern="^.$"))
 
 # Transient conversation handler 
 application.add_handler(conv_handler)
+application.add_handler(attendance_conv_handler)
 
 
 # Misc handlers
