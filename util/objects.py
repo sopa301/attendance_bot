@@ -1,7 +1,8 @@
 from enum import Enum
 from datetime import datetime
 
-from util.texts import escape_markdown_characters, generate_status_string, ABSENT
+from util.texts import escape_markdown_characters, generate_status_string, ABSENT, LAST_MINUTE_CANCELLATION
+from util.constants import *
 
 class PollType(Enum):
   WEEKLY = 0
@@ -20,7 +21,6 @@ class EventPoll():
     self.title = title
     self.details = details
     self.type = PollType.WEEKLY
-    self.number_of_distinct_groups = 2
     self.allocations = allocations
     self.poll_group_id = None
 
@@ -49,7 +49,6 @@ class EventPoll():
     poll.id = dct["id"]
     poll.regulars = dct["regulars"]
     poll.non_regulars = dct["non_regulars"]
-    poll.number_of_distinct_groups = 2
     poll.type = PollType(dct["type"])
     poll.poll_group_id = dct["poll_group_id"]
     return poll
@@ -100,9 +99,9 @@ class PollGroup():
     for i, poll in enumerate(polls):
         st = EventPoll.format_iso_for_user(poll.start_time)
         et = EventPoll.format_iso_for_user(poll.end_time)
-        print("st: " + st)
-        print("et: " + et)
-        poll_body.append(f"{i+1}. {poll.title}\n{poll.details}\n{st} - {et}\n")
+        # print("st: " + st)
+        # print("et: " + et)
+        poll_body.append(f"{poll.title}\n{poll.details}\n{st} - {et}\n")
         if membership == "nr":
             lst = poll.non_regulars
         elif membership == "r":
@@ -111,7 +110,8 @@ class PollGroup():
             raise ValueError("Invalid poll type: " + membership)
         for j, person in enumerate(lst):
             poll_body.append(f"{j+1}. {person}")
-        poll_body.append("\n")
+        if i < len(polls) - 1:
+          poll_body.append("\n")
     poll_body = "\n".join(poll_body)
     return poll_body
 
@@ -124,10 +124,12 @@ class AttendanceList():
     self.regulars = []
     self.exco = []
     self.standins = []
+    self.reserves = []
   
   def update_administrative_details(self, old_list):
     self.id = old_list.id
     self.owner_id = old_list.owner_id
+    self.reserves = old_list.reserves
 
   def insert_owner_id(self, owner_id):
     self.owner_id = owner_id
@@ -140,7 +142,8 @@ class AttendanceList():
       "non_regulars": self.non_regulars,
       "regulars": self.regulars,
       "exco": self.exco,
-      "standins": self.standins
+      "standins": self.standins,
+      "reserves": self.reserves
     }
   
   def find_user_by_id(self, id: str):
@@ -206,6 +209,7 @@ class AttendanceList():
     attendance_list.regulars = dct["regulars"]
     attendance_list.exco = dct["exco"]
     attendance_list.standins = dct["standins"]
+    attendance_list.reserves = dct["reserves"] if "reserves" in dct else []
     return attendance_list
 
   def to_parsable_list(self):
@@ -297,12 +301,72 @@ class AttendanceList():
     attendance_list.details = [poll.title, poll.details]
     attendance_list.regulars = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "r"}, poll.regulars))[:poll.allocations[1]]
     num_regulars = len(attendance_list.regulars)
-    attendance_list.non_regulars = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "nr"}, poll.non_regulars))
-    attendance_list.non_regulars = attendance_list.non_regulars[:max(poll.allocations[0], 24 - num_regulars)]
-    attendance_list.exco = []
-    attendance_list.standins = []
+    temp = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "nr"}, poll.non_regulars))
+    attendance_list.non_regulars = temp[:max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars)]
+    attendance_list.reserves = temp[max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars):]
 
     return attendance_list
+  
+  def get_non_present_penalisable_names(self):
+    absent = []
+    cancelled = []
+    if PENALISE_NON_REGULARS:
+      for person in self.non_regulars:
+        if person["status"] == ABSENT:
+          absent.append(person["id"])
+        elif person["status"] == LAST_MINUTE_CANCELLATION:
+          cancelled.append(person["id"])
+    if PENALISE_REGULARS:
+      for person in self.regulars:
+        if person["status"] == ABSENT:
+          absent.append(person["id"])
+        elif person["status"] == LAST_MINUTE_CANCELLATION:
+          cancelled.append(person["id"])
+    if PENALISE_STANDINS:
+      for person in self.standins:
+        if person["status"] == ABSENT:
+          absent.append(person["id"])
+        elif person["status"] == LAST_MINUTE_CANCELLATION:
+          cancelled.append(person["id"])
+    return absent, cancelled
+  
+  def get_all_player_names(self):
+    return list(map(lambda x: x["id"], self.non_regulars)) \
+      + list(map(lambda x: x["id"], self.regulars)) \
+      + list(map(lambda x: x["id"], self.standins))
+
+  def remove_banned_people(self, banned_people):
+    removed_non_regulars_count = 0
+    removed_regulars_count = 0
+    removed_standins_count = 0
+    for person in banned_people:
+      found = False
+      for category in [self.non_regulars, self.regulars, self.standins]:
+        for i, tp in enumerate(category):
+          if tp["id"] == person:
+            found = True
+            category.pop(i)
+            if category == self.non_regulars:
+              removed_non_regulars_count += 1
+            elif category == self.regulars:
+              removed_regulars_count += 1
+            elif category == self.standins:
+              removed_standins_count += 1
+            break
+        if found:
+          break
+      if not found:
+        raise ValueError("Person not found in attendance list: " + person)
+    return removed_non_regulars_count, removed_regulars_count, removed_standins_count
+  
+  def replenish_numbers(self):
+    # do only for non regulars for now
+    num_total = len(self.non_regulars) + len(self.regulars) + len(self.standins)
+    num_to_replace = MAX_PEOPLE_PER_SESSION - num_total
+    if num_to_replace <= 0:
+      return
+    self.standins.extend(self.reserves[:num_to_replace])
+    self.reserves = self.reserves[num_to_replace:]
 
 # Indicate if function has executed - else message to return to user stored
 class Status():

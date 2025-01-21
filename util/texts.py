@@ -1,4 +1,4 @@
-
+from util.constants import ABSENT_SYMBOL, PRESENT_SYMBOL, CANCELLATION_SYMBOL
 
 START_TEXT = "Hi! I am the attendance bot. Please click:\n" \
         + "/new_poll to create a new weekly poll\n" \
@@ -22,10 +22,6 @@ INFO_TEXT = "This bot is designed to help you manage your weekly events between 
 CANCEL_TEXT = "Bye!"
 
 ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
-
-PRESENT_SYMBOL = "✅"
-ABSENT_SYMBOL = "❌"
-CANCELLATION_SYMBOL = "🚫"
 
 status_map = [ABSENT_SYMBOL, PRESENT_SYMBOL, CANCELLATION_SYMBOL]
 

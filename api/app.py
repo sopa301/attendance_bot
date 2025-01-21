@@ -243,9 +243,14 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
     user = update.callback_query.from_user
     query = update.callback_query.data
     poll_id, poll_type, _ = decode_poll_voting_callback(query)
-    poll = get_event_poll(poll_id)
     username = f"@{user.username}"
-    toggle_person_in_event(poll_id, poll, username, poll_type)
+    try:
+      poll = get_event_poll(poll_id)
+      toggle_person_in_event(poll_id, poll, username, poll_type)
+    except PollNotFoundError:
+      await update.callback_query.edit_message_text("Poll has closed.")
+      await update.callback_query.answer()
+      return
     poll_group = get_poll_group(poll.poll_group_id)
     polls = get_event_polls(poll_group.get_poll_ids())
     poll_body = poll_group.generate_poll_group_text(polls, poll_type)

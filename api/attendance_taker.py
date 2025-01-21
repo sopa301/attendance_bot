@@ -87,16 +87,22 @@ async def handle_select_poll_group(update: Update, context: CustomContext) -> in
 
 async def handle_select_poll(update: Update, context: CustomContext) -> int:
     poll_id = update.callback_query.data
-    poll = get_event_poll(poll_id)
+    try:
+      poll = get_event_poll(poll_id)
+    except PollNotFoundError:
+      await update.callback_query.answer()
+      await update.callback_query.edit_message_text("Poll not found.")
+      return ConversationHandler.END
     attendance_list = AttendanceList.from_poll(poll)
     attendance_list.insert_owner_id(update.callback_query.from_user.id)
     attendance_list_id = insert_attendance_list(attendance_list)
     attendance_list.insert_id(attendance_list_id)
-    summary_text = attendance_list.generate_summary_text()
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
-                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
-                                    parse_mode="MarkdownV2")
+    ban_list = get_and_update_banned_personnel(attendance_list)
+    while len(ban_list) > 0:
+      attendance_list.remove_banned_people(ban_list)
+      attendance_list.replenish_numbers()
+      ban_list = get_and_update_banned_personnel(attendance_list)
+    await edit_to_edit_list(attendance_list, update)
     return ConversationHandler.END
 
 async def handle_view_attendance_list(update: Update, context: CustomContext) -> int:
@@ -107,7 +113,8 @@ async def handle_view_attendance_list(update: Update, context: CustomContext) ->
     inlinekeyboard = [
         [InlineKeyboardButton("Take Attendance", callback_data=encode_manage_attendance_list("take_attendance"))],
         [InlineKeyboardButton("Edit", callback_data=encode_manage_attendance_list("edit"))],
-        [InlineKeyboardButton("Delete", callback_data=encode_manage_attendance_list("delete"))]
+        [InlineKeyboardButton("Delete", callback_data=encode_manage_attendance_list("delete"))],
+        [InlineKeyboardButton("Log and Delete", callback_data=encode_manage_attendance_list("log_and_delete"))]
     ]
     await update.callback_query.edit_message_text("What would you like to do?", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
     return routes["MANAGE_ATTENDANCE_LIST"]
@@ -116,11 +123,7 @@ async def handle_manage_attendance_list(update: Update, context: CustomContext) 
     attendance_list = AttendanceList.from_dict(context.user_data["attendance_list"])
     command = decode_manage_attendance_list(update.callback_query.data)
     if command == "take_attendance":
-      summary_text = attendance_list.generate_summary_text()
-      inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-      await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
-                                      reply_markup=InlineKeyboardMarkup(inlinekeyboard),
-                                      parse_mode="MarkdownV2")
+      await edit_to_edit_list(attendance_list, update)
       return ConversationHandler.END
     elif command == "edit":
         await update.callback_query.edit_message_text("Please copy and edit the list, then send it to me.")
@@ -129,6 +132,11 @@ async def handle_manage_attendance_list(update: Update, context: CustomContext) 
     elif command == "delete":
         delete_attendance_list(attendance_list.id)
         await update.callback_query.edit_message_text("Attendance list deleted.")
+        return ConversationHandler.END
+    elif command == "log_and_delete":
+        log_attendance_list(attendance_list)
+        delete_attendance_list(attendance_list.id)
+        await update.callback_query.edit_message_text("Attendance list logged and deleted.")
         return ConversationHandler.END
     else:
         raise ValueError("Invalid command: " + command)
@@ -166,11 +174,17 @@ async def process_inputted_attendance_list(update: Update, context: CustomContex
     return ConversationHandler.END
 
 async def display_edit_list(attendance_list: AttendanceList, update: Update) -> None:
+    await base_edit_list(attendance_list, update.message.reply_text)
+
+async def edit_to_edit_list(attendance_list, update) -> None:
+    await base_edit_list(attendance_list, update.callback_query.edit_message_text)
+    
+async def base_edit_list(attendance_list, fn) -> int:
     summary_text = attendance_list.generate_summary_text()
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.message.reply_text(summary_text + "\n\nPlease choose the handle of the person you want to edit\.",
-                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
-                                    parse_mode="MarkdownV2")
+    await fn(summary_text + "\n\nPlease edit using the buttons below\.",
+             reply_markup=InlineKeyboardMarkup(inlinekeyboard),
+             parse_mode="MarkdownV2")
 
 def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList) -> list:
     inlinekeyboard = []
@@ -215,15 +229,14 @@ async def change_status(update: Update, context: CustomContext) -> None:
     user_id, attendance_list_id, new_status = decode_mark_attendance(update.callback_query.data)
     attendance_list = get_attendance_list(attendance_list_id)
     selected_user = attendance_list.find_user_by_id(user_id)
+    if selected_user["status"] == new_status:
+        await update.callback_query.answer()
+        return ConversationHandler.END
     attendance_list.update_user_status(user_id, new_status)
     update_attendance_list(attendance_list.id, attendance_list, user_id, new_status)
     logger.info("User %s selected %s with id %s, set to %s", user.first_name, selected_user["name"], selected_user["id"], selected_user["status"])
     await update.callback_query.answer()
-    summary_text = attendance_list.generate_summary_text()
-    inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    await update.callback_query.edit_message_text(summary_text + "\n\nPlease edit using the buttons below\.",
-                                    reply_markup=InlineKeyboardMarkup(inlinekeyboard),
-                                    parse_mode="MarkdownV2")
+    await edit_to_edit_list(attendance_list, update)
     return ConversationHandler.END
 
 async def do_nothing(update: Update, context: CustomContext) -> None:
