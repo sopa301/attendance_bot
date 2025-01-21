@@ -365,7 +365,7 @@ class AttendanceList():
     num_to_replace = MAX_PEOPLE_PER_SESSION - num_total
     if num_to_replace <= 0:
       return
-    self.standins.extend(self.reserves[:num_to_replace])
+    self.non_regulars.extend(self.reserves[:num_to_replace])
     self.reserves = self.reserves[num_to_replace:]
 
 # Indicate if function has executed - else message to return to user stored
