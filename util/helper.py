@@ -41,7 +41,7 @@ def parse_dt_to_iso(date_time: str, status: Status) -> str:
     return input_date.isoformat()
 
   except ValueError as e:
-    status.set_message(str(e))
+    status.set_message("Invalid date time input.\n1. Check if you added additional symbols.\n2. Check if day or month is valid.")
     return "" 
 
 

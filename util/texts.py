@@ -21,6 +21,12 @@ ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 PRESENT_SYMBOL = "✅"
 ABSENT_SYMBOL = "❌"
 
+POLL_GROUP_TEMPLATE = "Template: PB for week 1. Attendance is on a first come first serve basis!"
+
+DETAILS_TEMPLATE = "Template: USC Multipurpose Courts 16 & 17. Max 24 people"
+
+DATE_FORMAT_TEMPLATE = "Format should be in dd/mm/YYYY,HH:MM.\n Template: 01/05/2025,10:30"
+
 def generate_status_string(status: int, name: str, index: int) -> str:
     if status == ABSENT:
         return generate_absent_string(name, index)
