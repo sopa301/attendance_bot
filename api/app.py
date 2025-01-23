@@ -86,7 +86,12 @@ async def poll_title_clicked_callback(update: Update, context: CustomContext) ->
     user = update.callback_query.from_user
     logger.info("User %s clicked on a poll title.", user.first_name)
     poll_group_id = update.callback_query.data
-    poll_group = PollGroup.from_dict(context.user_data["poll_groups"][poll_group_id])
+    try:
+      poll_group = PollGroup.from_dict(context.user_data["poll_groups"][poll_group_id])
+    except PollGroupNotFoundError:
+      await update.callback_query.edit_message_text("Poll has been deleted.")
+      await update.callback_query.answer()
+      return
     polls = get_event_polls(poll_group.get_poll_ids())
     response_text = poll_group.generate_overview_text(polls)
     keyboard = get_poll_group_inline_keyboard(poll_group.id)
