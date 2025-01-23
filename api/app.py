@@ -325,12 +325,17 @@ async def error_handler(update: object, context: CustomContext) -> None:
         "</pre>\n\n"
         f"<pre>context.chat_data = {html.escape(str(context.chat_data))}</pre>\n\n"
         f"<pre>context.user_data = {html.escape(str(context.user_data))}</pre>\n\n"
-        # f"<pre>{html.escape(tb_string)}</pre>"
+    )
+    message2 = (
+        f"<pre>{html.escape(tb_string)}</pre>"
     )
 
     # Finally, send the message
     await context.bot.send_message(
         chat_id=ADMIN_CHAT_ID, text=message, parse_mode=ParseMode.HTML
+    )
+    await context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID, text=message2, parse_mode=ParseMode.HTML
     )
 
 async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
