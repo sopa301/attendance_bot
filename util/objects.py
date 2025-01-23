@@ -139,40 +139,40 @@ class AttendanceList():
       "id": self.id,
       "owner_id": self.owner_id,
       "details": self.details,
-      "non_regulars": self.non_regulars,
-      "regulars": self.regulars,
+      "non_regulars": list(map(lambda x: x.to_dict(), self.non_regulars)),
+      "regulars": list(map(lambda x: x.to_dict(), self.regulars)),
       "exco": self.exco,
-      "standins": self.standins,
-      "reserves": self.reserves
+      "standins": list(map(lambda x: x.to_dict(), self.standins)),
+      "reserves": list(map(lambda x: x.to_dict(), self.reserves))
     }
   
   def find_user_by_id(self, id: str):
     for user in self.non_regulars:
-      if user["id"] == id:
+      if user.id == id:
         return user
     for user in self.regulars:
-      if user["id"] == id:
+      if user.id == id:
         return user
     for user in self.standins:
-      if user["id"] == id:
+      if user.id == id:
         return user
     raise ValueError("User not found with id: " + str(id))
   
   def get_category_and_index(self, user_id):
     for user in self.non_regulars:
-      if user["id"] == user_id:
+      if user.id == user_id:
         return "non_regulars", self.non_regulars.index(user)
     for user in self.regulars:
-      if user["id"] == user_id:
+      if user.id == user_id:
         return "regulars", self.regulars.index(user)
     for user in self.standins:
-      if user["id"] == user_id:
+      if user.id == user_id:
         return "standins", self.standins.index(user)
     raise ValueError("User not found with id: " + str(user_id))
   
   def update_user_status(self, id: int, status: int):
     user = self.find_user_by_id(id)
-    user["status"] = status
+    user.status = status
 
   def generate_summary_text(self):
     output_list = []
@@ -182,20 +182,20 @@ class AttendanceList():
 
     output_list.append("Non regulars")
     for i, tp in enumerate(self.non_regulars):
-      output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
+      output_list.append(generate_status_string(tp.status, tp.name, i+1))
 
     output_list.append("")
 
     output_list.append("Regulars")
     for i, tp in enumerate(self.regulars):
-      output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
+      output_list.append(generate_status_string(tp.status, tp.name, i+1))
 
     if len(self.standins) > 0:
       output_list.append("")
 
       output_list.append("Standins")
       for i, tp in enumerate(self.standins):
-        output_list.append(generate_status_string(tp["status"], tp["name"], i+1))
+        output_list.append(generate_status_string(tp.status, tp.name, i+1))
 
     return "\n".join(output_list)
 
@@ -205,11 +205,11 @@ class AttendanceList():
     attendance_list.owner_id = dct["owner_id"]
     attendance_list.id = dct["id"]
     attendance_list.details = dct["details"]
-    attendance_list.non_regulars = dct["non_regulars"]
-    attendance_list.regulars = dct["regulars"]
+    attendance_list.non_regulars = list(map(lambda x: Person.from_dict(x), dct["non_regulars"]))
+    attendance_list.regulars = list(map(lambda x: Person.from_dict(x), dct["regulars"]))
     attendance_list.exco = dct["exco"]
-    attendance_list.standins = dct["standins"]
-    attendance_list.reserves = dct["reserves"] if "reserves" in dct else []
+    attendance_list.standins = list(map(lambda x: Person.from_dict(x), dct["standins"]))
+    attendance_list.reserves = list(map(lambda x: Person.from_dict(x), dct["reserves"])) if "reserves" in dct else []
     return attendance_list
 
   def to_parsable_list(self):
@@ -220,19 +220,19 @@ class AttendanceList():
 
     output_list.append("Non regulars")
     for i, tp in enumerate(self.non_regulars):
-      output_list.append(f"{i+1}. {tp['name']}")
+      output_list.append(f"{i+1}. {tp.name}")
 
     output_list.append("")
 
     output_list.append("Regulars")
     for i, tp in enumerate(self.regulars):
-      output_list.append(f"{i+1}. {tp['name']}")
+      output_list.append(f"{i+1}. {tp.name}")
 
     output_list.append("")
 
     output_list.append("Standins")
     for i, tp in enumerate(self.standins):
-      output_list.append(f"{i+1}. {tp['name']}")
+      output_list.append(f"{i+1}. {tp.name}")
 
     output_list.append("")
 
@@ -289,7 +289,7 @@ class AttendanceList():
       if s == "":
         continue
       name = s[s.index('.')+1:].strip()
-      lst.append({"name": name, "status": ABSENT, "id": name, "membership": membership})
+      lst.append(Person(name, name, ABSENT, membership))
     return lst
 
   def insert_id(self, id):
@@ -299,41 +299,38 @@ class AttendanceList():
   def from_poll(poll: EventPoll):
     attendance_list = AttendanceList()
     attendance_list.details = [poll.title, poll.details]
-    attendance_list.regulars = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "r"}, poll.regulars))[:poll.allocations[1]]
+    attendance_list.regulars = list(map(lambda name: Person(name, name, ABSENT, "r"), poll.regulars))[:poll.allocations[1]]
     num_regulars = len(attendance_list.regulars)
-    temp = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "nr"}, poll.non_regulars))
+    temp = list(map(lambda name: Person(name, name, ABSENT, "nr"), poll.non_regulars))
     attendance_list.non_regulars = temp[:max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars)]
     attendance_list.reserves = temp[max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars):]
 
     return attendance_list
   
+  @staticmethod
+  def get_non_present_penalisable_names_from_list(lst, condition, absent_list, cancelled_list):
+    if not condition:
+      return absent_list, cancelled_list
+    for person in lst:
+      if person.status == ABSENT:
+        absent_list.append(person.id)
+      elif person.status == LAST_MINUTE_CANCELLATION:
+        cancelled_list.append(person.id)
+    return absent_list, cancelled_list
+
+
   def get_non_present_penalisable_names(self):
     absent = []
     cancelled = []
-    if PENALISE_NON_REGULARS:
-      for person in self.non_regulars:
-        if person["status"] == ABSENT:
-          absent.append(person["id"])
-        elif person["status"] == LAST_MINUTE_CANCELLATION:
-          cancelled.append(person["id"])
-    if PENALISE_REGULARS:
-      for person in self.regulars:
-        if person["status"] == ABSENT:
-          absent.append(person["id"])
-        elif person["status"] == LAST_MINUTE_CANCELLATION:
-          cancelled.append(person["id"])
-    if PENALISE_STANDINS:
-      for person in self.standins:
-        if person["status"] == ABSENT:
-          absent.append(person["id"])
-        elif person["status"] == LAST_MINUTE_CANCELLATION:
-          cancelled.append(person["id"])
+    absent, cancelled = self.get_non_present_penalisable_names_from_list(self.non_regulars, PENALISE_NON_REGULARS, absent, cancelled)
+    absent, cancelled = self.get_non_present_penalisable_names_from_list(self.regulars, PENALISE_REGULARS, absent, cancelled)
+    absent, cancelled = self.get_non_present_penalisable_names_from_list(self.standins, PENALISE_STANDINS, absent, cancelled)
     return absent, cancelled
   
   def get_all_player_names(self):
-    return list(map(lambda x: x["id"], self.non_regulars)) \
-      + list(map(lambda x: x["id"], self.regulars)) \
-      + list(map(lambda x: x["id"], self.standins))
+    return list(map(lambda x: x.id, self.non_regulars)) \
+      + list(map(lambda x: x.id, self.regulars)) \
+      + list(map(lambda x: x.id, self.standins))
 
   def remove_banned_people(self, banned_people):
     removed_non_regulars_count = 0
@@ -343,7 +340,7 @@ class AttendanceList():
       found = False
       for category in [self.non_regulars, self.regulars, self.standins]:
         for i, tp in enumerate(category):
-          if tp["id"] == person:
+          if tp.id == person:
             found = True
             category.pop(i)
             if category == self.non_regulars:
@@ -367,6 +364,30 @@ class AttendanceList():
       return
     self.non_regulars.extend(self.reserves[:num_to_replace])
     self.reserves = self.reserves[num_to_replace:]
+
+class Person():
+  def __init__(self, id=None, name=None, status=None, membership=None):
+    self.id = id
+    self.name = name
+    self.status = status
+    self.membership = membership
+
+  def to_dict(self):
+    return {
+      "id": self.id,
+      "name": self.name,
+      "status": self.status,
+      "membership": self.membership
+    }
+  
+  @staticmethod
+  def from_dict(dct):
+    person = Person()
+    person.id = dct["id"]
+    person.name = dct["name"]
+    person.status = dct["status"]
+    person.membership = dct["membership"]
+    return person
 
 # Indicate if function has executed - else message to return to user stored
 class Status():

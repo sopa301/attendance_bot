@@ -195,11 +195,11 @@ def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList)
         if len(lst) > 0:
           inlinekeyboard.append([InlineKeyboardButton(titles[index], callback_data=DO_NOTHING)])
         for index, person in enumerate(lst):
-            inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {status_map[person['status']]} {person['name']}", callback_data=DO_NOTHING)])
+            inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {status_map[person.status]} {person.name}", callback_data=DO_NOTHING)])
             inline_list = [
-                InlineKeyboardButton(PRESENT_SYMBOL, callback_data=encode_mark_attendance(person["id"], attendance_list.id, PRESENT)),
-                InlineKeyboardButton(ABSENT_SYMBOL, callback_data=encode_mark_attendance(person["id"], attendance_list.id, ABSENT)),
-                InlineKeyboardButton(CANCELLATION_SYMBOL, callback_data=encode_mark_attendance(person["id"], attendance_list.id, LAST_MINUTE_CANCELLATION))
+                InlineKeyboardButton(PRESENT_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, PRESENT)),
+                InlineKeyboardButton(ABSENT_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, ABSENT)),
+                InlineKeyboardButton(CANCELLATION_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, LAST_MINUTE_CANCELLATION))
             ]
             inlinekeyboard.append(inline_list)
     return inlinekeyboard
@@ -229,12 +229,12 @@ async def change_status(update: Update, context: CustomContext) -> None:
     user_id, attendance_list_id, new_status = decode_mark_attendance(update.callback_query.data)
     attendance_list = get_attendance_list(attendance_list_id)
     selected_user = attendance_list.find_user_by_id(user_id)
-    if selected_user["status"] == new_status:
+    if selected_user.status == new_status:
         await update.callback_query.answer()
         return ConversationHandler.END
     attendance_list.update_user_status(user_id, new_status)
     update_attendance_list(attendance_list.id, attendance_list, user_id, new_status)
-    logger.info("User %s selected %s with id %s, set to %s", user.first_name, selected_user["name"], selected_user["id"], selected_user["status"])
+    logger.info("User %s selected %s with id %s, set to %s", user.first_name, selected_user.name, selected_user.id, selected_user.status)
     await update.callback_query.answer()
     await edit_to_edit_list(attendance_list, update)
     return ConversationHandler.END
