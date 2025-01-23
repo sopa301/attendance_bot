@@ -47,6 +47,7 @@ def decode_delete_poll_callback(query: str) -> str:
     return query.split("_")[1]
 
 # Poll voting
+POLL_VOTING_REGEX_STRING = "^p_"
 def encode_poll_voting(poll_id: int, poll_type: str, index: int) -> str:
     return f"p_{poll_type}_{poll_id}_{index}"
 
@@ -55,6 +56,7 @@ def decode_poll_voting_callback(query: str) -> tuple:
     return poll_id, poll_type, int(index)
 
 # View attendance lists
+VIEW_ATTENDANCE_LISTS_REGEX_STRING = "^va_"
 def encode_view_attendance_list(a_l_id: str) -> str:
     return "va_" + a_l_id
 
@@ -62,12 +64,14 @@ def decode_view_attendance_list(encoded: str) -> str:
     return encoded.split("_")[1]
 
 # Mark attendance
-MARK_ATTENDANCE_REGEX_STRING = "^a_"
-def encode_mark_attendance(user_id: str, a_l_id: str) -> str:
-    return "a_" + user_id + "_" + a_l_id
+MARK_ATTENDANCE_REGEX_STRING = "^a,"
+def encode_mark_attendance(user_id: str, a_l_id: str, status: int) -> str:
+    return "a," + user_id + "," + a_l_id + "," + str(status)
 
 def decode_mark_attendance(encoded: str) -> tuple:
-    return encoded.split("_")[1:]
+    data = encoded.split(",")[1:]
+    data[2] = int(data[2])
+    return tuple(data)
 
 # View summary
 VIEW_SUMMARY_REGEX_STRING = "^s_"
@@ -76,3 +80,27 @@ def encode_view_attendance_summary(a_l_id: str) -> str:
 
 def decode_view_attendance_summary(encoded: str) -> str:
     return encoded.split("_")[1]
+
+# Manage attendance list
+MANAGE_ATTENDANCE_LIST_REGEX_STRING = "^ma,"
+def decode_manage_attendance_list(encoded: str) -> str:
+    return encoded.split(",")[1]
+
+def encode_manage_attendance_list(s: str) -> str:
+    return "ma," + s
+
+# # Select poll group for managing attendance
+# SELECT_POLL_GROUP_MANAGE_REGEX_STRING = "^pgm,"
+# def encode_select_poll_group_manage(group_id: str) -> str:
+#     return "pgm," + group_id
+
+# def decode_select_poll_group_manage(encoded: str) -> str:
+#     return encoded.split(",")[1]
+
+# # Select poll group for importing attendance list
+# SELECT_POLL_GROUP_IMPORT_REGEX_STRING = "^pgi,"
+# def encode_select_poll_group_import(group_id: str) -> str:
+#     return "pgi," + group_id
+
+# def decode_select_poll_group_import(encoded: str) -> str:
+#     return encoded.split(",")[1]

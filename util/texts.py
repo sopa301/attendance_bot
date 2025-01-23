@@ -1,4 +1,4 @@
-
+from util.constants import ABSENT_SYMBOL, PRESENT_SYMBOL, CANCELLATION_SYMBOL
 
 START_TEXT = "Hi! I am the attendance bot. Please click:\n" \
         + "/new_poll to create a new weekly poll\n" \
@@ -6,6 +6,11 @@ START_TEXT = "Hi! I am the attendance bot. Please click:\n" \
         + "/polls to manage your polls\n" \
         + "/info to get information about this bot\n" \
         + "/cancel to cancel the conversation" \
+
+ATTENDANCE_MENU_TEXT = "Please select an option:\n" \
+        + "/new_list to create a new attendance list\n" \
+        + "/import_from_poll to import a list from a poll\n" \
+        + "/view_lists to manage existing lists"
 
 REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT = "Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
 
@@ -18,8 +23,7 @@ CANCEL_TEXT = "Bye!"
 
 ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 
-PRESENT_SYMBOL = "✅"
-ABSENT_SYMBOL = "❌"
+status_map = [ABSENT_SYMBOL, PRESENT_SYMBOL, CANCELLATION_SYMBOL]
 
 POLL_GROUP_TEMPLATE = "Template: PB for week 1. Attendance is on a first come first serve basis!"
 
