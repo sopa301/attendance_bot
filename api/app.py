@@ -98,7 +98,7 @@ async def create_new_poll(update: Update, context: CustomContext) -> int:
     """Sends a message when the command /new_poll is issued"""
     user = update.message.from_user
     logger.info("User %s requested to create a new poll.", user.first_name)
-    await update.message.reply_text("What would you like to call this poll?\n" + POLL_GROUP_TEMPLATE)
+    await update.message.reply_text("What would you like to call this poll?\n" + POLL_GROUP_TEMPLATE, parse_mode=ParseMode.MARKDOWN_V2)
     context.user_data["polls"] = []
     return routes["GET_POLL_NAME"]
 
@@ -113,23 +113,32 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
     try:
         number_of_events = int(update.message.text)
         context.user_data["number_of_events"] = number_of_events
-        await update.message.reply_text("Please input the title of this event")
-        return routes["GET_TITLE"]
+        await update.message.reply_text("Please input the details of this event\n." + DETAILS_TEMPLATE, parse_mode=ParseMode.MARKDOWN_V2)
+        return routes["GET_DETAILS"]
     except ValueError:
         await update.message.reply_text("Please input a valid number.")
         return routes["GET_NUMBER_OF_EVENTS"]
 
-async def get_title(update: Update, context: CustomContext) -> int:
-    title = update.message.text
-    context.user_data["title"] = title
-    await update.message.reply_text("Please input the details of the event.\n" + DETAILS_TEMPLATE)
-    return routes["GET_DETAILS"]
-
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Please input the start time of the poll.\n" + DATE_FORMAT_TEMPLATE)
+    await update.message.reply_text("Please input the date, start and end time of the poll.\n" + DATE_FORMAT_TEMPLATE)
     return routes["GET_START_TIME"]
+
+async def get_datetime(update: Update, context: CustomContext) -> int:
+    date_time = update.message.text
+    
+    status = Status()
+    (start_dt, end_dt) = parse_dt_to_iso(date_time, status)
+    
+    if not status.status:
+        await update.message.reply_text(f"Unsuccessful: {status.message}. Please try again")
+        return routes["GET_START_TIME"]
+
+    context.user_data["start_time"] = start_dt 
+    context.user_data["end_time"] = end_dt
+    
+    return save_poll_in_db(update, context)
 
 async def get_start_time(update: Update, context: CustomContext) -> int:
     start_time = update.message.text
@@ -153,32 +162,20 @@ def get_poll_group_inline_keyboard(poll_id: str) -> list:
             [InlineKeyboardButton("Delete Poll", callback_data=encode_delete_poll(poll_id))]]
 
 # TODO: handle logic to loop back for multiple events
-async def get_end_time(update: Update, context: CustomContext) -> int:
-    end_time = update.message.text
-    status = Status()
-    et = parse_dt_to_iso(end_time, status)
-
-    if not status.status:
-        await update.message.reply_text(f"Unsuccessful: {status.message}. Please input end time again")
-        return routes["GET_END_TIME"]
-
-    if compare_time(context.user_data["start_time"], et) > 0:
-        await update.message.reply_text(f"Unsuccessful: end time given is before start time. Please input end time again")
-        return routes["GET_END_TIME"]
-    
+async def save_poll_in_db(update: Update, context: CustomContext) -> int:
     user_id = update.message.from_user.id
     st = context.user_data["start_time"]
-    title = context.user_data["title"]
+    et = context.user_data["end_time"] 
     details = context.user_data["details"]
-    poll = EventPoll(st, et, title, details, [12, 12])
+    poll = EventPoll(st, et, details, [12, 12])
     context.user_data["polls"].append(poll.to_dict())
 
     # Repeat the poll
     context.user_data["number_of_events"] -= 1
-    # num_events = context.user_data["number_of_events"]
+    num_events = context.user_data["number_of_events"]
     
-    # if num_events > 0:
-    #     return routes["GET_TITLE"]
+    if num_events > 0:
+        return routes["GET_TITLE"]
 
     polls_jsons = context.user_data["polls"]
     polls_ids = insert_event_polls_dicts(polls_jsons)
@@ -191,9 +188,9 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     await update.message.reply_text("Poll created.")
     await update.message.reply_text("Please click the button below to send the poll to another chat.",
                                     reply_markup=InlineKeyboardMarkup(inline_keyboard))
-    del context.user_data["title"]
     del context.user_data["details"]
     del context.user_data["start_time"]
+    del context.user_data["end_time"]
     del context.user_data["poll_name"]
     del context.user_data["number_of_events"]
     del context.user_data["polls"]
@@ -359,7 +356,6 @@ conv_handler = ConversationHandler(
                   CommandHandler("info", get_info), CommandHandler("polls", get_polls)],
     states={
         routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
-        routes["GET_TITLE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
         routes["GET_START_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],

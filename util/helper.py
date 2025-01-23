@@ -13,14 +13,14 @@ def parse_dt_to_iso(date_time: str, status: Status) -> str:
     return ""
   
   date = dt[0].strip().split("/")
-  time = dt[1].strip().split(":")
+  timings = dt[1].strip().split("-")
 
   if len(date) < 3:
     # invalid format
     status.set_message("Missing date fields")
     return "" 
   
-  if len(time) < 2: 
+  if len(timings) < 2: 
     status.set_message("Missing time fields")
     return "" 
 
@@ -28,17 +28,27 @@ def parse_dt_to_iso(date_time: str, status: Status) -> str:
     day = int(date[0])
     month = int(date[1])
     year = int(date[2])
-    hour = int(time[0])
-    minute = int(time[1])
+    [start_HH, start_MM] = timings[0].strip().split(":")
+    [end_HH, end_MM] = timings[1].strip().split(":") 
 
-    input_date = datetime.strptime(f"{day}/{month}/{year},{hour}:{minute}", "%d/%m/%Y,%H:%M")
-    
-    if input_date < curr_date:
+    start_HH = int(start_HH)
+    start_MM = int(start_MM)
+    end_HH = int(end_HH)
+    end_MM = int(end_MM)
+
+    start_date = datetime(year, month, day, start_HH, start_MM)
+    end_date = datetime(year, month, day, start_HH, start_MM)
+
+
+    if start_date < curr_date:
       status.set_message("Input date has passed. Please give another date")
       return "" 
+    
+    if start_date > end_date:
+      status.set_message("End timing cannot be before start timing. Please give valid time")
 
     status.set_success()
-    return input_date.isoformat()
+    return (start_date.isoformat(), end_date.isoformat())
 
   except ValueError as e:
     status.set_message("Invalid date time input.\n1. Check if you added additional symbols.\n2. Check if day or month is valid.")

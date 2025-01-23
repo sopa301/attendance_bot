@@ -25,9 +25,9 @@ ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
 
 status_map = [ABSENT_SYMBOL, PRESENT_SYMBOL, CANCELLATION_SYMBOL]
 
-POLL_GROUP_TEMPLATE = "Template: PB for week 1. Attendance is on a first come first serve basis!"
+POLL_GROUP_TEMPLATE = "eg: *PB for week 1. Attendance is on a first come first serve basis!*"
 
-DETAILS_TEMPLATE = "Template: USC Multipurpose Courts 16 & 17. Max 24 people"
+DETAILS_TEMPLATE = "eg: *USC Multipurpose Courts 16 & 17. Max 24 people*"
 
 DATE_FORMAT_TEMPLATE = "Format should be in dd/mm/YYYY,HH:MM.\n Template: 01/05/2025,10:30"
 

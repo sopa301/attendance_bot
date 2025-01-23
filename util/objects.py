@@ -13,13 +13,12 @@ class PollType(Enum):
 # also handle the updating of all messages when a poll is updated
 # also handle the updating of all messages after the week passes
 class EventPoll():
-  def __init__(self, start_time, end_time, title, details, allocations):
+  def __init__(self, start_time, end_time, details, allocations):
     self.id = None
     self.start_time = start_time # start time of event
     self.end_time = end_time
     self.regulars = []
     self.non_regulars = []
-    self.title = title
     self.details = details
     self.type = PollType.WEEKLY
     self.allocations = allocations
@@ -32,7 +31,6 @@ class EventPoll():
       "end_time": self.end_time,
       "regulars": self.regulars,
       "non_regulars": self.non_regulars,
-      "title": self.title,
       "details": self.details,
       "type": self.type.value,
       "allocations": self.allocations,
@@ -48,7 +46,7 @@ class EventPoll():
 
   @staticmethod
   def from_dict(dct):
-    poll = EventPoll(dct["start_time"], dct["end_time"], dct["title"], dct["details"], dct["allocations"])
+    poll = EventPoll(dct["start_time"], dct["end_time"], dct["details"], dct["allocations"])
     poll.id = dct["id"]
     poll.regulars = dct["regulars"]
     poll.non_regulars = dct["non_regulars"]
@@ -122,7 +120,7 @@ class PollGroup():
     [start_date, start_time] = EventPoll.format_dt_string(poll.start_time)
     [end_date, end_time] = EventPoll.format_dt_string(poll.end_time)
 
-    return f"{poll.title}\nDate: {start_date}\nTime: {start_time.lower()} - {end_time.lower()}\nDetails: {poll.details}\n"
+    return f"Date: {start_date}\nTime: {start_time.lower()} - {end_time.lower()}\nDetails: {poll.details}\n"
 
 class AttendanceList():
   def __init__(self):
@@ -307,7 +305,7 @@ class AttendanceList():
   @staticmethod
   def from_poll(poll: EventPoll):
     attendance_list = AttendanceList()
-    attendance_list.details = [poll.title, poll.details]
+    attendance_list.details = [poll.details]
     attendance_list.regulars = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "r"}, poll.regulars))[:poll.allocations[1]]
     num_regulars = len(attendance_list.regulars)
     temp = list(map(lambda x: {"name": x, "status": ABSENT, "id": x, "membership": "nr"}, poll.non_regulars))
