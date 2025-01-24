@@ -46,8 +46,9 @@ class EventPoll():
   def format_dt_string(iso_dt: str) -> List[str]:
     dt = datetime.fromisoformat(iso_dt)
     dt_string = dt.strftime("%a, %d/%m/%Y_%#I:%M%p").replace(":00", "")
-    [date, time, *extra] = dt_string.split('_')
-    return [date, time]
+    date, time, *_ = dt_string.split('_')
+    time = time.lstrip('0')
+    return date, time
 
   @staticmethod
   def from_dict(dct):
@@ -59,11 +60,16 @@ class EventPoll():
     poll.poll_group_id = dct["poll_group_id"]
     return poll
   
-  def generate_poll_details_template(self) -> str:
+  def generate_poll_details_template(self, markdownV2 = True) -> str:
     [start_date, start_time] = EventPoll.format_dt_string(self.start_time)
     [_, end_time] = EventPoll.format_dt_string(self.end_time)
-
-    return f"Date: {start_date}\nTime: {start_time.lower()} - {end_time.lower()}\nDetails: {self.details}\n"
+    if markdownV2:
+      out = []
+      out.append(f"*__Date\: {escape_markdown_characters(start_date)}__*")
+      out.append(f"Time\: {escape_markdown_characters(start_time.lower())} \- {escape_markdown_characters(end_time.lower())}")
+      out.append(f"{escape_markdown_characters(self.details)}")
+      return out
+    return list((f"Date: {start_date}", f"Time: {start_time.lower()} - {end_time.lower()}", f"{self.details}"))
 
   def insert_id(self, id):
     self.id = id
@@ -103,7 +109,7 @@ class PollGroup():
     group.number_of_distinct_groups = 2
     return group
   
-  def generate_overview_text(self, polls: list, markdownV2=False) -> str:
+  def generate_overview_text(self, polls: list, markdownV2=True) -> str:
     out = [
       self.generate_poll_group_text(polls, "nr", markdownV2),
       "",
@@ -115,11 +121,8 @@ class PollGroup():
     title = self.name if not markdownV2 else escape_markdown_characters(self.name)
     poll_body = [f"*{title}*", ""]
     for i, poll in enumerate(polls):
-        poll_header = poll.generate_poll_details_template()
-        if markdownV2:
-          poll_body.append(f"*{escape_markdown_characters(f'{i+1}. {poll_header}')}*")
-        else:    
-          poll_body.append(f"*{i+1}. {poll_header}*")
+        poll_header = poll.generate_poll_details_template(markdownV2)
+        poll_body.extend(poll_header)
         if membership == "nr":
             lst = poll.non_regulars
             poll_body.append("*[Non\-Regulars]*" if markdownV2 else "[Non-Regulars]")

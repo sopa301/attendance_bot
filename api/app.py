@@ -213,12 +213,11 @@ def generate_voting_buttons(polls: list, poll_type: str) -> list:
 
 async def forward_poll(update: Update, context: CustomContext) -> None:
     query = update.inline_query.query
-    poll_group_id, poll_type = decode_publish_poll_query(query)
-
     try:
+      poll_group_id, poll_type = decode_publish_poll_query(query)
       poll_group = get_poll_group(poll_group_id)
       polls = get_event_polls(poll_group.get_poll_ids())
-    except PollGroupNotFoundError or PollNotFoundError:
+    except (PollGroupNotFoundError, PollNotFoundError,IndexError):
       # TODO: handle this better
       await update.inline_query.answer([])
       return
@@ -256,6 +255,9 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
     user = update.callback_query.from_user
     query = update.callback_query.data
     poll_id, poll_type, _ = decode_poll_voting_callback(query)
+    if user.username is None:
+        await update.callback_query.answer(text="Please set a username in your Telegram settings to vote.")
+        return
     username = f"@{user.username}"
     try:
       poll = get_event_poll(poll_id)
