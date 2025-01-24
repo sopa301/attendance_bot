@@ -1,5 +1,6 @@
 from enum import Enum
 from datetime import datetime
+from typing import List
 
 from util.texts import escape_markdown_characters, generate_status_string, ABSENT, LAST_MINUTE_CANCELLATION
 from util.constants import *
@@ -39,9 +40,11 @@ class EventPoll():
     }
   
   @staticmethod
-  def format_iso_for_user(iso_dt: str):
+  def format_dt_string(iso_dt: str) -> List[str]:
     dt = datetime.fromisoformat(iso_dt)
-    return dt.strftime("%d %B %y, %I:%M%p").lower().lstrip('0')
+    dt_string = dt.strftime("%a, %d %B/%#I%p")
+    [date, time, *extra] = dt_string.split('/')
+    return [date, time]
 
   @staticmethod
   def from_dict(dct):
@@ -97,15 +100,14 @@ class PollGroup():
   def generate_poll_group_text(self, polls: list, membership: str) -> str:
     poll_body = [self.name + "\n"]
     for i, poll in enumerate(polls):
-        st = EventPoll.format_iso_for_user(poll.start_time)
-        et = EventPoll.format_iso_for_user(poll.end_time)
-        # print("st: " + st)
-        # print("et: " + et)
-        poll_body.append(f"{poll.title}\n{poll.details}\n{st} - {et}\n")
+        poll_header = PollGroup.generate_poll_details_template(poll)
+        poll_body.append(f"*{i+1}. {poll_header}*")
         if membership == "nr":
             lst = poll.non_regulars
+            poll_body.append("*[Non-Regulars]*")
         elif membership == "r":
             lst = poll.regulars
+            poll_body.append("*[Regulars]*")
         else:
             raise ValueError("Invalid poll type: " + membership)
         for j, person in enumerate(lst):
@@ -114,6 +116,13 @@ class PollGroup():
           poll_body.append("\n")
     poll_body = "\n".join(poll_body)
     return poll_body
+  
+  @staticmethod
+  def generate_poll_details_template(poll: EventPoll) -> str:
+    [start_date, start_time] = EventPoll.format_dt_string(poll.start_time)
+    [end_date, end_time] = EventPoll.format_dt_string(poll.end_time)
+
+    return f"{poll.title}\nDate: {start_date}\nTime: {start_time.lower()} - {end_time.lower()}\nDetails: {poll.details}\n"
 
 class AttendanceList():
   def __init__(self):

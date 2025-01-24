@@ -32,7 +32,7 @@ from util import import_env
 from util.db import *
 from util.helper import parse_dt_to_iso, compare_time
 from util.encodings import *
-from util.texts import INFO_TEXT, START_TEXT, CANCEL_TEXT, ATTENDANCE_MENU_TEXT
+from util.texts import INFO_TEXT, START_TEXT, CANCEL_TEXT, POLL_GROUP_TEMPLATE, DETAILS_TEMPLATE, DATE_FORMAT_TEMPLATE, ATTENDANCE_MENU_TEXT
 
 from api.attendance_taker import *
 from api.util import CustomContext, WebhookUpdate, routes
@@ -103,7 +103,7 @@ async def create_new_poll(update: Update, context: CustomContext) -> int:
     """Sends a message when the command /new_poll is issued"""
     user = update.message.from_user
     logger.info("User %s requested to create a new poll.", user.first_name)
-    await update.message.reply_text("What would you like to call this poll?")
+    await update.message.reply_text("What would you like to call this poll?\n" + POLL_GROUP_TEMPLATE)
     context.user_data["polls"] = []
     return routes["GET_POLL_NAME"]
 
@@ -127,13 +127,13 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
 async def get_title(update: Update, context: CustomContext) -> int:
     title = update.message.text
     context.user_data["title"] = title
-    await update.message.reply_text("Please input the details of the event.")
+    await update.message.reply_text("Please input the details of the event.\n" + DETAILS_TEMPLATE)
     return routes["GET_DETAILS"]
 
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Please input the start time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025,10:30)")
+    await update.message.reply_text("Please input the start time of the poll.\n" + DATE_FORMAT_TEMPLATE)
     return routes["GET_START_TIME"]
 
 async def get_start_time(update: Update, context: CustomContext) -> int:
@@ -147,7 +147,7 @@ async def get_start_time(update: Update, context: CustomContext) -> int:
         return routes["GET_START_TIME"]
 
     context.user_data["start_time"] = start_dt 
-    await update.message.reply_text("Please input the end time of the poll in the format dd/mm/YYYY,HH:MM. (eg: 01/05/2025,10:30)")
+    await update.message.reply_text("Please input the end time of the poll in the format.\n" + DATE_FORMAT_TEMPLATE)
 
     return routes["GET_END_TIME"]
 
@@ -163,20 +163,27 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     status = Status()
     et = parse_dt_to_iso(end_time, status)
 
-    if compare_time(context.user_data["start_time"], et) > 0:
-        await update.message.reply_text(f"Unsuccessful: end time given is before start time. Please input end time again")
-        return routes["GET_END_TIME"]
-
     if not status.status:
         await update.message.reply_text(f"Unsuccessful: {status.message}. Please input end time again")
         return routes["GET_END_TIME"]
 
+    if compare_time(context.user_data["start_time"], et) > 0:
+        await update.message.reply_text(f"Unsuccessful: end time given is before start time. Please input end time again")
+        return routes["GET_END_TIME"]
+    
     user_id = update.message.from_user.id
     st = context.user_data["start_time"]
     title = context.user_data["title"]
     details = context.user_data["details"]
     poll = EventPoll(st, et, title, details, [12, 12])
     context.user_data["polls"].append(poll.to_dict())
+
+    # Repeat the poll
+    context.user_data["number_of_events"] -= 1
+    # num_events = context.user_data["number_of_events"]
+    
+    # if num_events > 0:
+    #     return routes["GET_TITLE"]
 
     polls_jsons = context.user_data["polls"]
     polls_ids = insert_event_polls_dicts(polls_jsons)
@@ -262,7 +269,7 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
 
     polls = get_event_polls(poll_group.get_poll_ids())
     reply_markup = InlineKeyboardMarkup(generate_voting_buttons(polls, poll_type))
-    await update.callback_query.edit_message_text(poll_body, reply_markup=reply_markup)
+    await update.callback_query.edit_message_text(poll_body, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     logger.info("User %s responded to the poll.", user.username)
     await update.callback_query.answer()
 
