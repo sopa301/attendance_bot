@@ -117,7 +117,8 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
     try:
         number_of_events = int(update.message.text)
         context.user_data["number_of_events"] = number_of_events
-        await update.message.reply_text("Please input the details of this event")
+        context.user_data["current_event"] = 1
+        await update.message.reply_text(f"Please input the details of event 1.\n" + DETAILS_TEMPLATE)
         return routes["GET_DETAILS"]
     except ValueError:
         await update.message.reply_text("Please input a valid number.")
@@ -171,11 +172,12 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     context.user_data["polls"].append(poll.to_dict())
 
     # Repeat the poll
-    context.user_data["number_of_events"] -= 1
-    num_events = context.user_data["number_of_events"]
+    context.user_data["current_event"] += 1
+    total_events = context.user_data["number_of_events"]
+    current_event_count = context.user_data["current_event"]
     
-    if num_events > 0:
-        await update.message.reply_text("Please input the details of the next event.")
+    if current_event_count <= total_events:
+        await update.message.reply_text(f"Please input the details of event {current_event_count}.")
         return routes["GET_DETAILS"]
 
     polls_jsons = context.user_data["polls"]
@@ -193,6 +195,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     del context.user_data["start_time"]
     del context.user_data["poll_name"]
     del context.user_data["number_of_events"]
+    del context.user_data["current_event"]
     del context.user_data["polls"]
     return ConversationHandler.END
 
