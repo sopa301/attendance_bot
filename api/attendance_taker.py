@@ -80,7 +80,7 @@ async def handle_select_poll_group(update: Update, context: CustomContext) -> in
       return ConversationHandler.END
     keyboard = []
     for poll in polls:
-        keyboard.append([InlineKeyboardButton(poll.title, callback_data=poll.id)])
+        keyboard.append([InlineKeyboardButton(poll.get_title(), callback_data=poll.id)])
     await update.callback_query.answer()
     await update.callback_query.edit_message_text("Please select the poll you want to import from.", reply_markup=InlineKeyboardMarkup(keyboard))
     return routes["SELECT_POLL"]

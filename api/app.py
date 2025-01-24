@@ -119,16 +119,16 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
         number_of_events = int(update.message.text)
         context.user_data["number_of_events"] = number_of_events
         await update.message.reply_text("Please input the title of this event")
-        return routes["GET_TITLE"]
+        return routes["GET_DETAILS"]
     except ValueError:
         await update.message.reply_text("Please input a valid number.")
         return routes["GET_NUMBER_OF_EVENTS"]
 
-async def get_title(update: Update, context: CustomContext) -> int:
-    title = update.message.text
-    context.user_data["title"] = title
-    await update.message.reply_text("Please input the details of the event.\n" + DETAILS_TEMPLATE)
-    return routes["GET_DETAILS"]
+# async def get_title(update: Update, context: CustomContext) -> int:
+#     title = update.message.text
+#     context.user_data["title"] = title
+#     await update.message.reply_text("Please input the details of the event.\n" + DETAILS_TEMPLATE)
+#     return routes["GET_DETAILS"]
 
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
@@ -173,17 +173,16 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     
     user_id = update.message.from_user.id
     st = context.user_data["start_time"]
-    title = context.user_data["title"]
     details = context.user_data["details"]
-    poll = EventPoll(st, et, title, details, [12, 12])
+    poll = EventPoll(st, et, details, [12, 12])
     context.user_data["polls"].append(poll.to_dict())
 
     # Repeat the poll
     context.user_data["number_of_events"] -= 1
-    # num_events = context.user_data["number_of_events"]
+    num_events = context.user_data["number_of_events"]
     
-    # if num_events > 0:
-    #     return routes["GET_TITLE"]
+    if num_events > 0:
+        return routes["GET_DETAILS"]
 
     polls_jsons = context.user_data["polls"]
     polls_ids = insert_event_polls_dicts(polls_jsons)
@@ -207,7 +206,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
 def generate_voting_buttons(polls: list, poll_type: str) -> list:
     keyboard = []
     for i, poll in enumerate(polls):
-        keyboard.append([InlineKeyboardButton(f"{poll.title}",
+        keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
                                               callback_data=encode_poll_voting(poll.id, poll_type, i))])
     return keyboard
 
@@ -369,7 +368,6 @@ conv_handler = ConversationHandler(
                   CommandHandler("info", get_info), CommandHandler("polls", get_polls)],
     states={
         routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
-        routes["GET_TITLE"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
         routes["GET_START_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],

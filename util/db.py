@@ -218,22 +218,3 @@ def delete_poll_group(group_id):
 
 def delete_attendance_list(attendance_id):
   return attendance_collection.delete_one({"_id": ObjectId(attendance_id)})
-
-
-if __name__ == "__main__":
-  print("Testing db.py")
-  poll = EventPoll("2022-01-01T00:00:00", "2022-01-01T01:00:00", "Test", "Test", [])
-  poll_ids = insert_event_polls([poll])
-  print(poll_ids)
-  poll_group = PollGroup("Test", "Test")
-  poll_group.insert_poll_ids(poll_ids)
-  group_id = insert_poll_group(poll_group)
-  print(get_event_polls(poll_ids))
-  print(get_poll_group(group_id))
-  add_person_to_event_poll(poll_ids[0], "Test", "non_regulars")
-  add_person_to_event_poll(poll_ids[0], "Test", "regulars")
-  add_person_to_event_poll(poll_ids[0], "Test", "non_regulars")
-  remove_person_from_event_poll(poll_ids[0], "Test", "non_regulars")
-  delete_poll_group(group_id)
-  # print(get_event_polls())
-  print("Done testing db.py")
