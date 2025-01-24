@@ -45,7 +45,7 @@ class EventPoll():
   @staticmethod
   def format_dt_string(iso_dt: str) -> List[str]:
     dt = datetime.fromisoformat(iso_dt)
-    dt_string = dt.strftime("%a, %d %B/%#I%p")
+    dt_string = dt.strftime("%a, %d %B/%#I:%M%p").replace(":00", "")
     [date, time, *extra] = dt_string.split('/')
     return [date, time]
 
@@ -111,7 +111,7 @@ class PollGroup():
     ]
     return "\n".join(out)
 
-  def generate_poll_group_text(self, polls: list, membership: str, markdownV2=False) -> str:
+  def generate_poll_group_text(self, polls: list, membership: str, markdownV2=True) -> str:
     poll_body = [self.name if not markdownV2 else escape_markdown_characters(self.name), ""]
     for i, poll in enumerate(polls):
         poll_header = poll.generate_poll_details_template()
@@ -121,10 +121,10 @@ class PollGroup():
           poll_body.append(f"*{i+1}. {poll_header}*")
         if membership == "nr":
             lst = poll.non_regulars
-            poll_body.append("*[Non\-Regulars]*")
+            poll_body.append("*[Non\-Regulars]*" if markdownV2 else "[Non-Regulars]")
         elif membership == "r":
             lst = poll.regulars
-            poll_body.append("*[Regulars]*")
+            poll_body.append("*[Regulars]*" if markdownV2 else "[Regulars]")
         else:
             raise ValueError("Invalid poll type: " + membership)
         for j, person in enumerate(lst):

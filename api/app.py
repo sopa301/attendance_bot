@@ -227,6 +227,7 @@ async def forward_poll(update: Update, context: CustomContext) -> None:
                 poll_body,
             ),
             reply_markup=reply_markup, 
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     )
     await update.inline_query.answer(results)
