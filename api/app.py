@@ -93,9 +93,9 @@ async def poll_title_clicked_callback(update: Update, context: CustomContext) ->
       await update.callback_query.answer()
       return
     polls = get_event_polls(poll_group.get_poll_ids())
-    response_text = poll_group.generate_overview_text(polls)
+    response_text = poll_group.generate_overview_text(polls, True)
     keyboard = get_poll_group_inline_keyboard(poll_group.id)
-    await update.callback_query.edit_message_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.callback_query.edit_message_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
     await update.callback_query.answer()
     return ConversationHandler.END
 
@@ -113,22 +113,15 @@ async def get_poll_name(update: Update, context: CustomContext) -> int:
     context.user_data["poll_name"] = poll_name
     return routes["GET_NUMBER_OF_EVENTS"]
 
-# currently, the thing only accepts one event. TODO: implement up to n events
 async def get_number_of_events(update: Update, context: CustomContext) -> int:
     try:
         number_of_events = int(update.message.text)
         context.user_data["number_of_events"] = number_of_events
-        await update.message.reply_text("Please input the title of this event")
+        await update.message.reply_text("Please input the details of this event")
         return routes["GET_DETAILS"]
     except ValueError:
         await update.message.reply_text("Please input a valid number.")
         return routes["GET_NUMBER_OF_EVENTS"]
-
-# async def get_title(update: Update, context: CustomContext) -> int:
-#     title = update.message.text
-#     context.user_data["title"] = title
-#     await update.message.reply_text("Please input the details of the event.\n" + DETAILS_TEMPLATE)
-#     return routes["GET_DETAILS"]
 
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
@@ -147,7 +140,7 @@ async def get_start_time(update: Update, context: CustomContext) -> int:
         return routes["GET_START_TIME"]
 
     context.user_data["start_time"] = start_dt 
-    await update.message.reply_text("Please input the end time of the poll in the format.\n" + DATE_FORMAT_TEMPLATE)
+    await update.message.reply_text("Please input the end time of the poll.\n" + DATE_FORMAT_TEMPLATE)
 
     return routes["GET_END_TIME"]
 
@@ -182,6 +175,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     num_events = context.user_data["number_of_events"]
     
     if num_events > 0:
+        await update.message.reply_text("Please input the details of the next event.")
         return routes["GET_DETAILS"]
 
     polls_jsons = context.user_data["polls"]
@@ -195,7 +189,6 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
     await update.message.reply_text("Poll created.")
     await update.message.reply_text("Please click the button below to send the poll to another chat.",
                                     reply_markup=InlineKeyboardMarkup(inline_keyboard))
-    del context.user_data["title"]
     del context.user_data["details"]
     del context.user_data["start_time"]
     del context.user_data["poll_name"]
@@ -285,10 +278,10 @@ async def handle_update_results_callback(update: Update, context: CustomContext)
       await update.callback_query.edit_message_text("Poll has been deleted.")
       await update.callback_query.answer()
       return
-    combined_text = poll_group.generate_overview_text(polls)
+    combined_text = poll_group.generate_overview_text(polls, True)
     # TODO: find a better way to check for no changes
     if old_text.strip("\n ") != combined_text.strip("\n "):
-      await update.callback_query.edit_message_text(combined_text, reply_markup=update.callback_query.message.reply_markup)
+      await update.callback_query.edit_message_text(combined_text, reply_markup=update.callback_query.message.reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     await update.callback_query.answer()
 
 async def handle_delete_poll_callback(update: Update, context: CustomContext) -> None:

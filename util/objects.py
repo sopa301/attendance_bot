@@ -25,7 +25,6 @@ class EventPoll():
     self.poll_group_id = None
 
   def get_title(self):
-    # get string representation of the start time - end time
     [start_date, start_time] = EventPoll.format_dt_string(self.start_time)
     [_, end_time] = EventPoll.format_dt_string(self.end_time)
     return f"{start_date} {start_time} - {end_time}"
@@ -60,6 +59,12 @@ class EventPoll():
     poll.poll_group_id = dct["poll_group_id"]
     return poll
   
+  def generate_poll_details_template(self) -> str:
+    [start_date, start_time] = EventPoll.format_dt_string(self.start_time)
+    [_, end_time] = EventPoll.format_dt_string(self.end_time)
+
+    return f"Date: {start_date}\nTime: {start_time.lower()} - {end_time.lower()}\nDetails: {self.details}\n"
+
   def insert_id(self, id):
     self.id = id
 
@@ -98,35 +103,39 @@ class PollGroup():
     group.number_of_distinct_groups = 2
     return group
   
-  def generate_overview_text(self, polls: list) -> str:
-    return "Non Regulars:\n" + self.generate_poll_group_text(polls, "nr") + "\n\nRegulars\n" + self.generate_poll_group_text(polls, "r")
+  def generate_overview_text(self, polls: list, markdownV2=False) -> str:
+    out = [
+      self.generate_poll_group_text(polls, "nr", markdownV2),
+      "",
+      self.generate_poll_group_text(polls, "r", markdownV2),
+    ]
+    return "\n".join(out)
 
-  def generate_poll_group_text(self, polls: list, membership: str) -> str:
-    poll_body = [self.name + "\n"]
+  def generate_poll_group_text(self, polls: list, membership: str, markdownV2=False) -> str:
+    poll_body = [self.name if not markdownV2 else escape_markdown_characters(self.name), ""]
     for i, poll in enumerate(polls):
-        poll_header = PollGroup.generate_poll_details_template(poll)
-        poll_body.append(f"*{i+1}. {poll_header}*")
+        poll_header = poll.generate_poll_details_template()
+        if markdownV2:
+          poll_body.append(f"*{escape_markdown_characters(f'{i+1}. {poll_header}')}*")
+        else:    
+          poll_body.append(f"*{i+1}. {poll_header}*")
         if membership == "nr":
             lst = poll.non_regulars
-            poll_body.append("*[Non-Regulars]*")
+            poll_body.append("*[Non\-Regulars]*")
         elif membership == "r":
             lst = poll.regulars
             poll_body.append("*[Regulars]*")
         else:
             raise ValueError("Invalid poll type: " + membership)
         for j, person in enumerate(lst):
-            poll_body.append(f"{j+1}. {person}")
+            if markdownV2:
+              poll_body.append(f"{j+1}\. {escape_markdown_characters(person)}")
+            else:
+              poll_body.append(f"{j+1}. {person}")
         if i < len(polls) - 1:
           poll_body.append("\n")
     poll_body = "\n".join(poll_body)
     return poll_body
-  
-  @staticmethod
-  def generate_poll_details_template(poll: EventPoll) -> str:
-    [start_date, start_time] = EventPoll.format_dt_string(poll.start_time)
-    [_, end_time] = EventPoll.format_dt_string(poll.end_time)
-
-    return f"Date: {start_date}\nTime: {start_time.lower()} - {end_time.lower()}\nDetails: {poll.details}\n"
 
 class AttendanceList():
   def __init__(self):
