@@ -225,9 +225,9 @@ async def forward_poll(update: Update, context: CustomContext) -> None:
             title=poll_group.name,
             input_message_content=InputTextMessageContent(
                 poll_body,
+                parse_mode=ParseMode.MARKDOWN_V2
             ),
-            reply_markup=reply_markup, 
-            parse_mode=ParseMode.MARKDOWN_V2
+            reply_markup=reply_markup
         )
     )
     await update.inline_query.answer(results)
