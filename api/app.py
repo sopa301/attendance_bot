@@ -116,11 +116,17 @@ async def get_poll_name(update: Update, context: CustomContext) -> int:
 async def get_number_of_events(update: Update, context: CustomContext) -> int:
     try:
         number_of_events = int(update.message.text)
+        if number_of_events < 1:
+            raise ValueError()
         context.user_data["number_of_events"] = number_of_events
         context.user_data["current_event"] = 1
         await update.message.reply_text(f"Please input the details of event 1.\n" + DETAILS_TEMPLATE)
         return routes["GET_DETAILS"]
-    except ValueError:
+    except ValueError as e:
+        await update.message.reply_text("Please input a valid number that is at least 1.")
+        return routes["GET_NUMBER_OF_EVENTS"]
+    except Exception as e: # catch all forms of tomfoolery
+        logger.error(e)
         await update.message.reply_text("Please input a valid number.")
         return routes["GET_NUMBER_OF_EVENTS"]
 
@@ -151,7 +157,6 @@ def get_poll_group_inline_keyboard(poll_id: str) -> list:
             [InlineKeyboardButton("Update Results", callback_data=encode_update_poll_results(poll_id))], 
             [InlineKeyboardButton("Delete Poll", callback_data=encode_delete_poll(poll_id))]]
 
-# TODO: handle logic to loop back for multiple events
 async def get_end_time(update: Update, context: CustomContext) -> int:
     end_time = update.message.text
     status = Status()
@@ -364,7 +369,7 @@ conv_handler = ConversationHandler(
                   CommandHandler("new_poll", create_new_poll),
                   CommandHandler("info", get_info), CommandHandler("polls", get_polls)],
     states={
-        routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.Regex("^\d+$") & ~filters.COMMAND, get_number_of_events)],
+        routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_number_of_events)],
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
         routes["GET_START_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],
