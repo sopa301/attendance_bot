@@ -45,7 +45,7 @@ class EventPoll():
   @staticmethod
   def format_dt_string(iso_dt: str) -> List[str]:
     dt = datetime.fromisoformat(iso_dt)
-    dt_string = dt.strftime("%a, %d %B/%#I:%M%p").replace(":00", "")
+    dt_string = dt.strftime("%a, %d/%m/%Y/%#I:%M%p").replace(":00", "")
     [date, time, *extra] = dt_string.split('/')
     return [date, time]
 
