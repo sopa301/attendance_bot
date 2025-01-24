@@ -112,7 +112,8 @@ class PollGroup():
     return "\n".join(out)
 
   def generate_poll_group_text(self, polls: list, membership: str, markdownV2=True) -> str:
-    poll_body = [self.name if not markdownV2 else escape_markdown_characters(self.name), ""]
+    title = self.name if not markdownV2 else escape_markdown_characters(self.name)
+    poll_body = [f"*{title}*", ""]
     for i, poll in enumerate(polls):
         poll_header = poll.generate_poll_details_template()
         if markdownV2:
