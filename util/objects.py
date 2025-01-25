@@ -60,6 +60,7 @@ class EventPoll():
     poll.poll_group_id = dct["poll_group_id"]
     return poll
   
+  # To be used with MarkdownV2
   def generate_poll_details_template(self, markdownV2 = True) -> str:
     [start_date, start_time] = EventPoll.format_dt_string(self.start_time)
     [_, end_time] = EventPoll.format_dt_string(self.end_time)
@@ -109,33 +110,27 @@ class PollGroup():
     group.number_of_distinct_groups = 2
     return group
   
-  def generate_overview_text(self, polls: list, markdownV2=True) -> str:
+  # To be used with MarkdownV2
+  def generate_overview_text(self, polls: list) -> str:
     out = [
-      self.generate_poll_group_text(polls, "nr", markdownV2),
+      self.generate_poll_group_text(polls, "nr"),
       "",
-      self.generate_poll_group_text(polls, "r", markdownV2),
+      self.generate_poll_group_text(polls, "r"),
     ]
     return "\n".join(out)
 
-  def generate_poll_group_text(self, polls: list, membership: str, markdownV2=True) -> str:
-    title = self.name if not markdownV2 else escape_markdown_characters(self.name)
-    poll_body = [f"*{title}*", ""]
+  # To be used with Markdownv2
+  def generate_poll_group_text(self, polls: list, membership: str) -> str:
+    title = escape_markdown_characters(self.name)
+    membership_of_poll = "Non-Regulars" if membership == "nr" else "Regulars"
+    membership_of_poll = escape_markdown_characters(f"({membership_of_poll})")
+    poll_body = [f"*{title} {membership_of_poll}*", ""]
     for i, poll in enumerate(polls):
-        poll_header = poll.generate_poll_details_template(markdownV2)
+        poll_header = poll.generate_poll_details_template()
         poll_body.extend(poll_header)
-        if membership == "nr":
-            lst = poll.non_regulars
-            poll_body.append("*[Non\-Regulars]*" if markdownV2 else "[Non-Regulars]")
-        elif membership == "r":
-            lst = poll.regulars
-            poll_body.append("*[Regulars]*" if markdownV2 else "[Regulars]")
-        else:
-            raise ValueError("Invalid poll type: " + membership)
+        lst = poll.regulars if membership == "r" else poll.non_regulars
         for j, person in enumerate(lst):
-            if markdownV2:
-              poll_body.append(f"{j+1}\. {escape_markdown_characters(person)}")
-            else:
-              poll_body.append(f"{j+1}. {person}")
+          poll_body.append(f"{j+1}\. {escape_markdown_characters(person)}")
         if i < len(polls) - 1:
           poll_body.append("\n")
     poll_body = "\n".join(poll_body)

@@ -93,7 +93,7 @@ async def poll_title_clicked_callback(update: Update, context: CustomContext) ->
       await update.callback_query.answer()
       return
     polls = get_event_polls(poll_group.get_poll_ids())
-    response_text = poll_group.generate_overview_text(polls, True)
+    response_text = poll_group.generate_overview_text(polls)
     keyboard = get_poll_group_inline_keyboard(poll_group.id)
     await update.callback_query.edit_message_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
     await update.callback_query.answer()
@@ -217,7 +217,7 @@ async def forward_poll(update: Update, context: CustomContext) -> None:
       poll_group_id, poll_type = decode_publish_poll_query(query)
       poll_group = get_poll_group(poll_group_id)
       polls = get_event_polls(poll_group.get_poll_ids())
-    except (PollGroupNotFoundError, PollNotFoundError,IndexError):
+    except (PollGroupNotFoundError, PollNotFoundError, IndexError):
       # TODO: handle this better
       await update.inline_query.answer([])
       return
@@ -256,7 +256,7 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
     query = update.callback_query.data
     poll_id, poll_type, _ = decode_poll_voting_callback(query)
     if user.username is None:
-        await update.callback_query.answer(text="Please set a username in your Telegram settings to vote.")
+        await update.callback_query.answer(text="Please set a username in your Telegram settings to vote.", show_alert=True)
         return
     username = f"@{user.username}"
     try:
@@ -289,7 +289,7 @@ async def handle_update_results_callback(update: Update, context: CustomContext)
       await update.callback_query.edit_message_text("Poll has been deleted.")
       await update.callback_query.answer()
       return
-    combined_text = poll_group.generate_overview_text(polls, True)
+    combined_text = poll_group.generate_overview_text(polls)
     # TODO: find a better way to check for no changes
     if old_text.strip("\n ") != combined_text.strip("\n "):
       await update.callback_query.edit_message_text(combined_text, reply_markup=update.callback_query.message.reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
