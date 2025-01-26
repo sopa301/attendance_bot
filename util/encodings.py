@@ -3,6 +3,8 @@
 # inline queries and callback queries because they don't have the 
 # same handlers, so we can reuse some encoding functions.
 
+DO_NOTHING = "."  # For non-interactive buttons
+DO_NOTHING_REGEX_STRING = "^.$"
 # NON_REGULAR = "nr"
 # REGULAR = "r"
 
@@ -48,12 +50,12 @@ def decode_delete_poll_callback(query: str) -> str:
 
 # Poll voting
 POLL_VOTING_REGEX_STRING = "^p_"
-def encode_poll_voting(poll_id: int, poll_type: str, index: int) -> str:
-    return f"p_{poll_type}_{poll_id}_{index}"
+def encode_poll_voting(poll_id: str, poll_type: str, is_sign_up: bool) -> str:
+    return f"p_{poll_type}_{poll_id}_{1 if is_sign_up else 0}" # 1 for True, 0 for False
 
 def decode_poll_voting_callback(query: str) -> tuple:
-    poll_type, poll_id, index = query.split("_")[1:]
-    return poll_id, poll_type, int(index)
+    poll_type, poll_id, is_sign_up = query.split("_")[1:]
+    return poll_id, poll_type, bool(int(is_sign_up))
 
 # View attendance lists
 VIEW_ATTENDANCE_LISTS_REGEX_STRING = "^va_"

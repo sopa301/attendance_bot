@@ -208,7 +208,10 @@ def generate_voting_buttons(polls: list, poll_type: str) -> list:
     keyboard = []
     for i, poll in enumerate(polls):
         keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
-                                              callback_data=encode_poll_voting(poll.id, poll_type, i))])
+                                              callback_data=DO_NOTHING)])
+        keyboard.append([InlineKeyboardButton(SIGN_UP_SYMBOL, callback_data=encode_poll_voting(poll.id, poll_type, True)),
+                         InlineKeyboardButton(DROP_OUT_SYMBOL, callback_data=encode_poll_voting(poll.id, poll_type, False))])
+        
     return keyboard
 
 async def forward_poll(update: Update, context: CustomContext) -> None:
@@ -239,38 +242,42 @@ async def forward_poll(update: Update, context: CustomContext) -> None:
     )
     await update.inline_query.answer(results)
 
-def toggle_person_in_event(poll_id: str, poll: EventPoll, username: str, poll_type: str) -> None:
+def set_person_in_event(poll_id, username: str, poll_type: str, is_sign_up: bool) -> None:
     if poll_type == "nr":
         field = "non_regulars"
     elif poll_type == "r":
         field = "regulars"
     else:
         raise ValueError("Invalid poll type: " + poll_type)
-    if username in poll.non_regulars or username in poll.regulars:
-        remove_person_from_event_poll(poll_id, username, field)
-    else:
+    if is_sign_up:
         add_person_to_event_poll(poll_id, username, field)
+    else:
+        remove_person_from_event_poll(poll_id, username, field)
 
 async def handle_poll_voting_callback(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     query = update.callback_query.data
-    poll_id, poll_type, _ = decode_poll_voting_callback(query)
+    poll_id, poll_type, is_sign_up = decode_poll_voting_callback(query)
     if user.username is None:
         await update.callback_query.answer(text="Please set a username in your Telegram settings to vote.", show_alert=True)
         return
     username = f"@{user.username}"
     try:
       poll = get_event_poll(poll_id)
-      toggle_person_in_event(poll_id, poll, username, poll_type)
     except PollNotFoundError:
       await update.callback_query.edit_message_text("Poll has closed.")
       await update.callback_query.answer()
       return
+    is_changed = poll.is_person_status_changed(username, poll_type, is_sign_up)
+    if not is_changed:
+        logger.info("User %s is clicking the poll buttons like a monkey.", username)
+        await update.callback_query.answer()
+        return
+    set_person_in_event(poll_id, username, poll_type, is_sign_up)
     poll_group = get_poll_group(poll.poll_group_id)
     polls = get_event_polls(poll_group.get_poll_ids())
     poll_body = poll_group.generate_poll_group_text(polls, poll_type)
 
-    polls = get_event_polls(poll_group.get_poll_ids())
     reply_markup = InlineKeyboardMarkup(generate_voting_buttons(polls, poll_type))
     await update.callback_query.edit_message_text(poll_body, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     logger.info("User %s responded to the poll.", user.username)
@@ -405,7 +412,7 @@ application.add_handler(CallbackQueryHandler(handle_update_results_callback, pat
 application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern=DELETE_POLL_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern=VIEW_SUMMARY_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(change_status, pattern=MARK_ATTENDANCE_REGEX_STRING))
-application.add_handler(CallbackQueryHandler(do_nothing, pattern="^.$"))
+application.add_handler(CallbackQueryHandler(do_nothing, pattern=DO_NOTHING_REGEX_STRING))
 
 # Transient conversation handler 
 application.add_handler(conv_handler)

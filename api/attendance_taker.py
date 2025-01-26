@@ -188,7 +188,6 @@ async def base_edit_list(attendance_list, fn) -> int:
 
 def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList) -> list:
     inlinekeyboard = []
-    DO_NOTHING = "."
     lists = [attendance_list.non_regulars, attendance_list.regulars, attendance_list.standins]
     titles = ["NON REGULARS", "REGULARS", "STANDINS"]
     for index, lst in enumerate(lists):

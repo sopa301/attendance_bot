@@ -75,6 +75,15 @@ class EventPoll():
   def insert_id(self, id):
     self.id = id
 
+  def is_person_status_changed(self, username, membership, new_sign_up_status):
+    if membership == "r":
+      is_present = username in self.regulars
+    elif membership == "nr":
+      is_present = username in self.non_regulars
+    else:
+      raise ValueError("Invalid membership: " + membership)
+    return is_present != new_sign_up_status
+
 # TODO: create the aggregated poll results in the db as well for efficient access.
 # remember to use transactions to ensure that the poll results are consistent
 class PollGroup():
