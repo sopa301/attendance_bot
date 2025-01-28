@@ -283,6 +283,15 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
       pass # nothing changes
     logger.info("User %s responded to the poll.", user.username)
     
+def insert_poll_group_and_polls(poll_group: PollGroup, polls: list) -> None:
+    poll_ids = insert_event_polls(polls)
+    for i, poll in enumerate(polls):
+        poll.insert_id(poll_ids[i])
+    poll_group.insert_poll_ids(poll_ids)
+    group_id = insert_poll_group(poll_group)
+    update_poll_group_id(poll_ids, group_id)
+    poll_group.insert_id(group_id)
+
 async def handle_generate_next_poll_callback(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     logger.info("User %s requested to generate next week's poll.", user.username)
@@ -297,11 +306,7 @@ async def handle_generate_next_poll_callback(update: Update, context: CustomCont
       return
     new_group = poll_group.generate_next_group()
     next_polls = PollGroup.generate_next_polls(polls)
-    next_polls_ids = insert_event_polls(next_polls)
-    new_group.insert_poll_ids(next_polls_ids)
-    new_group_id = insert_poll_group(new_group)
-    update_poll_group_id(next_polls_ids, new_group_id)
-    new_group.insert_id(new_group_id)
+    insert_poll_group_and_polls(new_group, next_polls)
     # display next weeks poll
     response_text = poll_group.generate_overview_text(next_polls)
     keyboard = get_poll_group_inline_keyboard(new_group.id)
