@@ -294,9 +294,19 @@ def insert_poll_group_and_polls(poll_group: PollGroup, polls: list) -> None:
 
 async def handle_generate_next_poll_callback(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
-    logger.info("User %s requested to generate next week's poll.", user.username)
     data = update.callback_query.data
     poll_group_id = decode_generate_next_poll_callback(data)
+    await update.callback_query.answer()
+    context.user_data["poll_group_id"] = poll_group_id
+    logger.info("User %s requested to generate next week's poll.", user.username)
+    await update.callback_query.edit_message_text("What would you like to name the new poll?\n" + POLL_GROUP_TEMPLATE)
+    return routes["GET_NEW_POLL_NAME"]
+
+async def create_next_poll(update: Update, context: CustomContext) -> int:
+    logger.info("User %s provided a new poll title.", user.username)
+    user = update.message.from_user
+    new_poll_name = update.message.text
+    poll_group_id = context.user_data["poll_group_id"]
     try:
       poll_group = get_poll_group(poll_group_id)
       polls = get_event_polls(poll_group.get_poll_ids())
@@ -304,7 +314,7 @@ async def handle_generate_next_poll_callback(update: Update, context: CustomCont
       await update.callback_query.edit_message_text("Poll has been deleted.")
       await update.callback_query.answer()
       return
-    new_group = poll_group.generate_next_group()
+    new_group = poll_group.generate_next_group(new_poll_name)
     next_polls = PollGroup.generate_next_polls(polls)
     insert_poll_group_and_polls(new_group, next_polls)
     # display next weeks poll
@@ -312,6 +322,7 @@ async def handle_generate_next_poll_callback(update: Update, context: CustomCont
     keyboard = get_poll_group_inline_keyboard(new_group.id)
     await update.callback_query.message.reply_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
     await update.callback_query.answer()
+    return ConversationHandler.END
 
 async def handle_update_results_callback(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
@@ -414,6 +425,7 @@ conv_handler = ConversationHandler(
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],
         routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(poll_title_clicked_callback, pattern="^.+$")],
         routes["GET_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_poll_name)],
+        routes["GET_NEW_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, create_next_poll)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

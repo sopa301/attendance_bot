@@ -116,8 +116,8 @@ class PollGroup():
   def get_poll_ids(self):
     return self.polls_ids
   
-  def generate_next_group(self):
-    new_group = PollGroup(self.owner_id, self.name)
+  def generate_next_group(self, new_poll_name):
+    new_group = PollGroup(self.owner_id, new_poll_name)
     return new_group
   
   @staticmethod
