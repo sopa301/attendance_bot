@@ -298,7 +298,7 @@ async def handle_generate_next_poll_callback(update: Update, context: CustomCont
     new_group = poll_group.generate_next_group()
     next_polls = PollGroup.generate_next_polls(polls)
     next_polls_ids = insert_event_polls(next_polls)
-    poll_group.insert_poll_ids(next_polls_ids)
+    new_group.insert_poll_ids(next_polls_ids)
     new_group_id = insert_poll_group(new_group)
     update_poll_group_id(next_polls_ids, new_group_id)
     new_group.insert_id(new_group_id)
