@@ -32,14 +32,14 @@ logger = logging.getLogger(__name__)
 def generate_inline_keyboard_for_attendance_lists(attendance_lists: list) -> list:
     inlinekeyboard = []
     for attendance_list in attendance_lists:
-        inlinekeyboard.append([InlineKeyboardButton(attendance_list.details[0],
+        inlinekeyboard.append([InlineKeyboardButton(attendance_list.get_title(),
                                                     callback_data=encode_view_attendance_list(attendance_list.id))])
     return inlinekeyboard
 
 def generate_inline_keyboard_for_attendance_summaries(attendance_lists: list) -> list:
     inlinekeyboard = []
     for attendance_list in attendance_lists:
-        inlinekeyboard.append([InlineKeyboardButton(attendance_list.details[0],
+        inlinekeyboard.append([InlineKeyboardButton(attendance_list.get_title(),
                                                     callback_data=encode_view_attendance_summary(attendance_list.id))])
     return inlinekeyboard
 
@@ -116,7 +116,7 @@ async def handle_view_attendance_list(update: Update, context: CustomContext) ->
         [InlineKeyboardButton("Delete", callback_data=encode_manage_attendance_list("delete"))],
         [InlineKeyboardButton("Log and Delete", callback_data=encode_manage_attendance_list("log_and_delete"))]
     ]
-    await update.callback_query.edit_message_text("What would you like to do?", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
+    await update.callback_query.edit_message_text(f"Currently managing {attendance_list.get_title()}. What would you like to do?", reply_markup=InlineKeyboardMarkup(inlinekeyboard))
     return routes["MANAGE_ATTENDANCE_LIST"]
 
 async def handle_manage_attendance_list(update: Update, context: CustomContext) -> int:

@@ -1,3 +1,5 @@
+from util.constants import *
+
 # For encoding data into strings of up to 64 characters to be stored
 # in the callback data of inline keyboard buttons. We separate by
 # inline queries and callback queries because they don't have the 
@@ -5,32 +7,27 @@
 
 DO_NOTHING = "."  # For non-interactive buttons
 DO_NOTHING_REGEX_STRING = "^.$"
-# NON_REGULAR = "nr"
-# REGULAR = "r"
 
 ## Inline Queries
 
-# Publish non_regular polls
-PUBLISH_NON_REGULAR_POLL_REGEX_STRING = "^nr_"
-def encode_publish_non_regular_poll(poll_id: str) -> str:
-    return f"nr_{poll_id}"
+# Publish polls
+PUBLISH_POLL_REGEX_STRING = "^p_"
+def encode_publish_poll(poll_id: str) -> str:
+    return f"p_{poll_id}"
 
-# Publish regular polls
-PUBLISH_REGULAR_POLL_REGEX_STRING = "^r_"
-def encode_publish_regular_poll(poll_id: str) -> str:
-    return f"r_{poll_id}"
-
-def decode_publish_poll_query(query: str) -> tuple:
-    poll_group_id = query.split("_")[1]
-    if query.startswith("nr"):
-        poll_type = "nr"
-    elif query.startswith("r"):
-        poll_type = "r"
-    else:
-        raise ValueError("Invalid query type: " + query)
-    return poll_group_id, poll_type
+def decode_publish_poll_query(query: str) -> str:
+    return query.split("_")[1]
 
 ## Callback Queries
+
+# Generate next week's poll
+GENERATE_NEXT_POLL_REGEX_STRING = "^g_"
+def encode_generate_next_poll(poll_group_id: str) -> str:
+    return f"g_{poll_group_id}"
+
+def decode_generate_next_poll_callback(query: str) -> str:
+    return query.split("_")[1]
+
 
 # Update poll results
 UPDATE_POLL_RESULTS_REGEX_STRING = "^u_"
@@ -49,13 +46,13 @@ def decode_delete_poll_callback(query: str) -> str:
     return query.split("_")[1]
 
 # Poll voting
-POLL_VOTING_REGEX_STRING = "^p_"
-def encode_poll_voting(poll_id: str, poll_type: str, is_sign_up: bool) -> str:
-    return f"p_{poll_type}_{poll_id}_{1 if is_sign_up else 0}" # 1 for True, 0 for False
+POLL_VOTING_REGEX_STRING = "^v_"
+def encode_poll_voting(poll_id: str, membership: Membership, is_sign_up: bool) -> str:
+    return f"v_{membership.value}_{poll_id}_{1 if is_sign_up else 0}" # 1 for True, 0 for False
 
 def decode_poll_voting_callback(query: str) -> tuple:
-    poll_type, poll_id, is_sign_up = query.split("_")[1:]
-    return poll_id, poll_type, bool(int(is_sign_up))
+    membership, poll_id, is_sign_up = query.split("_")[1:]
+    return poll_id, Membership(int(membership)), bool(int(is_sign_up))
 
 # View attendance lists
 VIEW_ATTENDANCE_LISTS_REGEX_STRING = "^va_"

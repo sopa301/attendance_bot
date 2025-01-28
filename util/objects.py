@@ -1,5 +1,5 @@
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from util.texts import escape_markdown_characters, generate_status_string, ABSENT, LAST_MINUTE_CANCELLATION
@@ -60,8 +60,14 @@ class EventPoll():
     poll.poll_group_id = dct["poll_group_id"]
     return poll
   
-  # To be used with MarkdownV2
-  def generate_poll_details_template(self, markdownV2 = True) -> str:
+  def get_people_list_by_membership(self, membership: Membership):
+    if membership == Membership.REGULAR:
+      return self.regulars
+    elif membership == Membership.NON_REGULAR:
+      return self.non_regulars
+    raise ValueError("Invalid membership: " + membership)
+
+  def generate_poll_details_template(self, markdownV2 = True) -> list:
     [start_date, start_time] = EventPoll.format_dt_string(self.start_time)
     [_, end_time] = EventPoll.format_dt_string(self.end_time)
     if markdownV2:
@@ -75,10 +81,10 @@ class EventPoll():
   def insert_id(self, id):
     self.id = id
 
-  def is_person_status_changed(self, username, membership, new_sign_up_status):
-    if membership == "r":
+  def is_person_status_changed(self, username, membership: Membership, new_sign_up_status):
+    if membership == Membership.REGULAR:
       is_present = username in self.regulars
-    elif membership == "nr":
+    elif membership == Membership.NON_REGULAR:
       is_present = username in self.non_regulars
     else:
       raise ValueError("Invalid membership: " + membership)
@@ -92,7 +98,6 @@ class PollGroup():
     self.owner_id = owner_id
     self.id = None
     self.name = name
-    self.number_of_distinct_groups = 2
 
   def to_dict(self):
     return {
@@ -111,33 +116,48 @@ class PollGroup():
   def get_poll_ids(self):
     return self.polls_ids
   
+  def generate_next_group(self):
+    new_group = PollGroup(self.owner_id, self.name)
+    return new_group
+  
+  @staticmethod
+  def generate_next_polls(polls: list):
+    new_polls = []
+    for poll in polls:
+      new_start_time = datetime.fromisoformat(poll.start_time) + timedelta(weeks=1)
+      new_start_time = new_start_time.isoformat()
+      new_end_time = datetime.fromisoformat(poll.end_time) + timedelta(weeks=1)
+      new_end_time = new_end_time.isoformat()
+      new_poll = EventPoll(new_start_time, new_end_time, poll.details, poll.allocations)
+      new_polls.append(new_poll)
+    return new_polls
+  
   @staticmethod
   def from_dict(dct):
     group = PollGroup(dct["owner_id"], dct["name"])
     group.id = dct["id"]
     group.polls_ids = dct["polls_ids"]
-    group.number_of_distinct_groups = 2
     return group
   
   # To be used with MarkdownV2
   def generate_overview_text(self, polls: list) -> str:
     out = [
-      self.generate_poll_group_text(polls, "nr"),
-      "",
-      self.generate_poll_group_text(polls, "r"),
+      self.generate_poll_group_text(polls, Membership.NON_REGULAR),
+      escape_markdown_characters("-------------------------"),
+      self.generate_poll_group_text(polls, Membership.REGULAR),
     ]
     return "\n".join(out)
 
   # To be used with Markdownv2
-  def generate_poll_group_text(self, polls: list, membership: str) -> str:
+  def generate_poll_group_text(self, polls: list, membership: Membership) -> str:
     title = escape_markdown_characters(self.name)
-    membership_of_poll = "Non-Regulars" if membership == "nr" else "Regulars"
+    membership_of_poll = membership.to_representation()
     membership_of_poll = escape_markdown_characters(f"({membership_of_poll})")
     poll_body = [f"*{title} {membership_of_poll}*", ""]
     for i, poll in enumerate(polls):
         poll_header = poll.generate_poll_details_template()
         poll_body.extend(poll_header)
-        lst = poll.regulars if membership == "r" else poll.non_regulars
+        lst = poll.get_people_list_by_membership(membership)
         for j, person in enumerate(lst):
           poll_body.append(f"{j+1}\. {escape_markdown_characters(person)}")
         if i < len(polls) - 1:
@@ -191,10 +211,10 @@ class AttendanceList():
   def get_category_and_index(self, user_id):
     for user in self.non_regulars:
       if user.id == user_id:
-        return "non_regulars", self.non_regulars.index(user)
+        return user.membership.to_db_representation(), self.non_regulars.index(user)
     for user in self.regulars:
       if user.id == user_id:
-        return "regulars", self.regulars.index(user)
+        return user.membership.to_db_representation(), self.regulars.index(user)
     for user in self.standins:
       if user.id == user_id:
         return "standins", self.standins.index(user)
@@ -228,6 +248,9 @@ class AttendanceList():
         output_list.append(generate_status_string(tp.status, tp.name, i+1))
 
     return "\n".join(output_list)
+
+  def get_title(self):
+    return self.details[0]
 
   @staticmethod
   def from_dict(dct):
@@ -286,6 +309,10 @@ class AttendanceList():
     1. ...
     2. ...
 
+    Standins
+    1. ...
+    2. ...
+
     Exco
     (Name)
     """
@@ -299,9 +326,9 @@ class AttendanceList():
         session_info.append(s)
     session_info = session_info[:last_non_empty_line+1]
     attendance_list.details = session_info
-    attendance_list.non_regulars = AttendanceList.parse_section(lines, "Non regulars", "Regulars", "nr")
-    attendance_list.regulars = AttendanceList.parse_section(lines, "Regulars", "Standins", "r")
-    attendance_list.standins = AttendanceList.parse_section(lines, "Standins", "Exco", "nr")
+    attendance_list.non_regulars = AttendanceList.parse_section(lines, "Non regulars", "Regulars", Membership.NON_REGULAR)
+    attendance_list.regulars = AttendanceList.parse_section(lines, "Regulars", "Standins", Membership.REGULAR)
+    attendance_list.standins = AttendanceList.parse_section(lines, "Standins", "Exco", Membership.NON_REGULAR)
 
     exco = []
     for s in lines[lines.index("Exco")+1:]:
@@ -328,10 +355,10 @@ class AttendanceList():
   @staticmethod
   def from_poll(poll: EventPoll):
     attendance_list = AttendanceList()
-    attendance_list.details = [poll.details]
-    attendance_list.regulars = list(map(lambda name: Person(name, name, ABSENT, "r"), poll.regulars))[:poll.allocations[1]]
+    attendance_list.details = [poll.get_title(), poll.details]
+    attendance_list.regulars = list(map(lambda name: Person(name, name, ABSENT, Membership.REGULAR), poll.regulars))[:poll.allocations[1]]
     num_regulars = len(attendance_list.regulars)
-    temp = list(map(lambda name: Person(name, name, ABSENT, "nr"), poll.non_regulars))
+    temp = list(map(lambda name: Person(name, name, ABSENT, Membership.NON_REGULAR), poll.non_regulars))
     attendance_list.non_regulars = temp[:max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars)]
     attendance_list.reserves = temp[max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars):]
 
@@ -406,7 +433,7 @@ class Person():
       "id": self.id,
       "name": self.name,
       "status": self.status,
-      "membership": self.membership
+      "membership": self.membership.value
     }
   
   @staticmethod
@@ -415,7 +442,7 @@ class Person():
     person.id = dct["id"]
     person.name = dct["name"]
     person.status = dct["status"]
-    person.membership = dct["membership"]
+    person.membership = Membership(dct["membership"])
     return person
 
 # Indicate if function has executed - else message to return to user stored
