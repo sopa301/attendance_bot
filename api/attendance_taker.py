@@ -194,8 +194,8 @@ def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList)
         if len(lst) > 0:
           inlinekeyboard.append([InlineKeyboardButton(titles[index], callback_data=DO_NOTHING)])
         for index, person in enumerate(lst):
-            inlinekeyboard.append([InlineKeyboardButton(f"{index+1}. {status_map[person.status]} {person.name}", callback_data=DO_NOTHING)])
             inline_list = [
+                InlineKeyboardButton(f"{index+1}. {status_map[person.status]} {person.name}", callback_data=DO_NOTHING),
                 InlineKeyboardButton(PRESENT_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, PRESENT)),
                 InlineKeyboardButton(ABSENT_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, ABSENT)),
                 InlineKeyboardButton(CANCELLATION_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, LAST_MINUTE_CANCELLATION))
