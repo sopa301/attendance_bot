@@ -93,7 +93,7 @@ async def poll_title_clicked_callback(update: Update, context: CustomContext) ->
     except PollGroupNotFoundError:
       await update.callback_query.edit_message_text("Poll has been deleted.")
       await update.callback_query.answer()
-      return
+      return ConversationHandler.END
     polls = get_event_polls(poll_group.get_poll_ids())
     response_text = poll_group.generate_overview_text(polls)
     keyboard = get_poll_group_inline_keyboard(poll_group.id)
@@ -303,25 +303,23 @@ async def handle_generate_next_poll_callback(update: Update, context: CustomCont
     return routes["GET_NEW_POLL_NAME"]
 
 async def create_next_poll(update: Update, context: CustomContext) -> int:
-    logger.info("User %s provided a new poll title.", user.username)
     user = update.message.from_user
+    logger.info("User %s provided a new poll title.", user.username)
     new_poll_name = update.message.text
     poll_group_id = context.user_data["poll_group_id"]
     try:
       poll_group = get_poll_group(poll_group_id)
       polls = get_event_polls(poll_group.get_poll_ids())
     except PollGroupNotFoundError or PollNotFoundError:
-      await update.callback_query.edit_message_text("Poll has been deleted.")
-      await update.callback_query.answer()
+      await update.message.reply_text("Poll has been deleted.")
       return
     new_group = poll_group.generate_next_group(new_poll_name)
     next_polls = PollGroup.generate_next_polls(polls)
     insert_poll_group_and_polls(new_group, next_polls)
     # display next weeks poll
-    response_text = poll_group.generate_overview_text(next_polls)
+    response_text = new_group.generate_overview_text(next_polls)
     keyboard = get_poll_group_inline_keyboard(new_group.id)
-    await update.callback_query.message.reply_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
-    await update.callback_query.answer()
+    await update.message.reply_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
     return ConversationHandler.END
 
 async def handle_update_results_callback(update: Update, context: CustomContext) -> None:
@@ -417,7 +415,8 @@ async def webhook_update(update: WebhookUpdate, context: CustomContext) -> None:
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start),
                   CommandHandler("new_poll", create_new_poll),
-                  CommandHandler("info", get_info), CommandHandler("polls", get_polls)],
+                  CommandHandler("info", get_info), CommandHandler("polls", get_polls),
+                  CallbackQueryHandler(handle_generate_next_poll_callback, pattern=GENERATE_NEXT_POLL_REGEX_STRING)],
     states={
         routes["GET_NUMBER_OF_EVENTS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_number_of_events)],
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
@@ -450,7 +449,6 @@ attendance_conv_handler = ConversationHandler(
 # Always-active request handlers
 application.add_handler(InlineQueryHandler(forward_poll))
 application.add_handler(CallbackQueryHandler(handle_poll_voting_callback, pattern=POLL_VOTING_REGEX_STRING))
-application.add_handler(CallbackQueryHandler(handle_generate_next_poll_callback, pattern=GENERATE_NEXT_POLL_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_update_results_callback, pattern=UPDATE_POLL_RESULTS_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern=DELETE_POLL_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern=VIEW_SUMMARY_REGEX_STRING))
