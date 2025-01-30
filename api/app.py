@@ -34,7 +34,10 @@ from util.constants import *
 from util.db import *
 from util.helper import parse_dt_to_iso, compare_time
 from util.encodings import *
-from util.texts import INFO_TEXT, START_TEXT, CANCEL_TEXT, POLL_GROUP_TEMPLATE, DETAILS_TEMPLATE, DATE_FORMAT_TEMPLATE, ATTENDANCE_MENU_TEXT
+from util.texts import (
+  INFO_TEXT, START_TEXT, CANCEL_TEXT, POLL_GROUP_TEMPLATE, DETAILS_TEMPLATE, DATE_FORMAT_TEMPLATE, ATTENDANCE_MENU_TEXT,
+  POLL_GROUP_MANAGEMENT_TEXT
+)
 
 from api.attendance_taker import *
 from api.util import CustomContext, WebhookUpdate, routes
@@ -81,7 +84,7 @@ async def get_polls(update: Update, context: CustomContext) -> int:
     inline_keyboard = []
     for group in poll_groups:
         inline_keyboard.append([InlineKeyboardButton(group.name, callback_data=encode_manage_poll_groups(group.id))])
-    await update.message.reply_text("Please select a poll group to view the polls.", reply_markup=InlineKeyboardMarkup(inline_keyboard))
+    await update.message.reply_text("Please select a poll to view.", reply_markup=InlineKeyboardMarkup(inline_keyboard))
     return ConversationHandler.END
 
 async def poll_title_clicked_callback(update: Update, context: CustomContext) -> None:
@@ -95,10 +98,8 @@ async def poll_title_clicked_callback(update: Update, context: CustomContext) ->
     except PollGroupNotFoundError:
       await update.callback_query.edit_message_text("Poll has been deleted.")
       return ConversationHandler.END
-    polls = get_event_polls(poll_group.get_poll_ids())
-    response_text = poll_group.generate_overview_text(polls)
     keyboard = get_poll_group_inline_keyboard(poll_group.id)
-    await update.callback_query.edit_message_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
+    await update.callback_query.edit_message_text(f"Viewing {poll_group.name}\n\n" + POLL_GROUP_MANAGEMENT_TEXT, reply_markup=InlineKeyboardMarkup(keyboard))
     return ConversationHandler.END
 
 async def create_new_poll(update: Update, context: CustomContext) -> int:
@@ -135,7 +136,7 @@ async def get_number_of_events(update: Update, context: CustomContext) -> int:
 async def get_details(update: Update, context: CustomContext) -> int:
     details = update.message.text
     context.user_data["details"] = details
-    await update.message.reply_text("Please input the start time of the poll.\n" + DATE_FORMAT_TEMPLATE)
+    await update.message.reply_text("Please input the start time of the event.\n" + DATE_FORMAT_TEMPLATE)
     return routes["GET_START_TIME"]
 
 async def get_start_time(update: Update, context: CustomContext) -> int:
@@ -149,14 +150,14 @@ async def get_start_time(update: Update, context: CustomContext) -> int:
         return routes["GET_START_TIME"]
 
     context.user_data["start_time"] = start_dt 
-    await update.message.reply_text("Please input the end time of the poll.\n" + DATE_FORMAT_TEMPLATE)
+    await update.message.reply_text("Please input the end time of the event.\n" + DATE_FORMAT_TEMPLATE)
 
     return routes["GET_END_TIME"]
 
 def get_poll_group_inline_keyboard(group_id: str) -> list:
     return [[InlineKeyboardButton("Publish Poll", switch_inline_query=encode_publish_poll(group_id))],
             [InlineKeyboardButton("Update Results", callback_data=encode_update_poll_results(group_id))], 
-            [InlineKeyboardButton("Manage Active Polls", callback_data=encode_manage_active_polls(group_id))],
+            [InlineKeyboardButton("Manage Active Events", callback_data=encode_manage_active_polls(group_id))],
             [InlineKeyboardButton("Generate Next Week's Poll", callback_data=encode_generate_next_poll(group_id))],
             [InlineKeyboardButton("Delete Poll", callback_data=encode_delete_poll(group_id))]]
 
@@ -197,7 +198,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
 
     inline_keyboard = get_poll_group_inline_keyboard(poll_group_id)
     await update.message.reply_text("Poll created.")
-    await update.message.reply_text("Please click the button below to send the poll to another chat.",
+    await update.message.reply_text(f"Viewing {poll_group.name}\n\n" + POLL_GROUP_MANAGEMENT_TEXT,
                                     reply_markup=InlineKeyboardMarkup(inline_keyboard))
     del context.user_data["details"]
     del context.user_data["start_time"]

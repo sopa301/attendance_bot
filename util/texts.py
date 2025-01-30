@@ -19,6 +19,12 @@ INFO_TEXT = "This bot is designed to help you manage your weekly events between 
         + "To get started, click /new_poll to create a new poll, /attendance to start taking attendance for the upcoming event, " \
         + "or /polls to manage your polls."
 
+POLL_GROUP_MANAGEMENT_TEXT = "Click 'Publish Poll' to publish the poll to a group.\n" \
+        + "Click 'Update Results' to view the latest results.\n" \
+        + "Click 'Manage Active Events' to set the viewable status of events.\n" \
+        + "Click 'Generate Next Week's Poll' to generate a new poll for the next week with the same details and time.\n" \
+        + "Click 'Delete Poll' to delete the poll." 
+
 CANCEL_TEXT = "Bye!"
 
 ABSENT, PRESENT, LAST_MINUTE_CANCELLATION = range(3)
