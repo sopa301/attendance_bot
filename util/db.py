@@ -130,6 +130,12 @@ def remove_person_from_event_poll(poll_id, username, field):
     {"$pull": {field: username}}
   )
 
+def set_active_status(poll_id, is_active):
+  return polls_collection.update_one(
+    {"_id": ObjectId(poll_id)},
+    {"$set": {"is_active": is_active}}
+  )
+
 def update_attendance_list(attendance_id, attendance_list:AttendanceList, user_id, new_status):
   category, index = attendance_list.get_category_and_index(user_id)
   return attendance_collection.update_one(

@@ -28,6 +28,31 @@ def encode_generate_next_poll(poll_group_id: str) -> str:
 def decode_generate_next_poll_callback(query: str) -> str:
     return query.split("_")[1]
 
+# Manage poll groups
+MANAGE_POLL_GROUPS_REGEX_STRING = "^mg_"
+def encode_manage_poll_groups(poll_group_id: str) -> str:
+    return f"mg_{poll_group_id}"
+
+def decode_manage_poll_groups_callback(query: str) -> str:
+    return query.split("_")[1]
+
+# Manage active polls
+MANAGE_ACTIVE_POLLS_REGEX_STRING = "^m_"
+
+def encode_manage_active_polls(poll_group_id: str) -> str:
+    return f"m_{poll_group_id}"
+
+def decode_manage_active_polls_callback(query: str) -> str:
+    return query.split("_")[1]
+
+# Set poll active status
+SET_POLL_ACTIVE_STATUS_REGEX_STRING = "^sp_"
+def encode_set_poll_active_status(poll_id: str, is_active: bool) -> str:
+    return f"sp_{poll_id}_{1 if is_active else 0}" # 1 for True, 0 for False
+
+def decode_set_poll_active_status_callback(query: str) -> tuple:
+    poll_id, is_active = query.split("_")[1:]
+    return poll_id, bool(int(is_active))
 
 # Update poll results
 UPDATE_POLL_RESULTS_REGEX_STRING = "^u_"

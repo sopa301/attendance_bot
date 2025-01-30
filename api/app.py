@@ -77,28 +77,28 @@ async def get_polls(update: Update, context: CustomContext) -> int:
     if not poll_groups:
         await update.message.reply_text("You have no polls.")
         return ConversationHandler.END
-    context.user_data["poll_groups"] = {group.id: group.to_dict() for group in poll_groups}
+    # context.user_data["poll_groups"] = {group.id: group.to_dict() for group in poll_groups}
     inline_keyboard = []
     for group in poll_groups:
-        inline_keyboard.append([InlineKeyboardButton(group.name, callback_data=group.id)])
+        inline_keyboard.append([InlineKeyboardButton(group.name, callback_data=encode_manage_poll_groups(group.id))])
     await update.message.reply_text("Please select a poll group to view the polls.", reply_markup=InlineKeyboardMarkup(inline_keyboard))
-    return routes["SELECT_POLL_GROUP"]
+    return ConversationHandler.END
 
 async def poll_title_clicked_callback(update: Update, context: CustomContext) -> None:
     user = update.callback_query.from_user
     logger.info("User %s clicked on a poll title.", user.first_name)
-    poll_group_id = update.callback_query.data
+    await update.callback_query.answer()
+    data = update.callback_query.data
+    poll_group_id = decode_manage_poll_groups_callback(data)
     try:
-      poll_group = PollGroup.from_dict(context.user_data["poll_groups"][poll_group_id])
+      poll_group = get_poll_group(poll_group_id)
     except PollGroupNotFoundError:
       await update.callback_query.edit_message_text("Poll has been deleted.")
-      await update.callback_query.answer()
       return ConversationHandler.END
     polls = get_event_polls(poll_group.get_poll_ids())
     response_text = poll_group.generate_overview_text(polls)
     keyboard = get_poll_group_inline_keyboard(poll_group.id)
     await update.callback_query.edit_message_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN_V2)
-    await update.callback_query.answer()
     return ConversationHandler.END
 
 async def create_new_poll(update: Update, context: CustomContext) -> int:
@@ -153,11 +153,12 @@ async def get_start_time(update: Update, context: CustomContext) -> int:
 
     return routes["GET_END_TIME"]
 
-def get_poll_group_inline_keyboard(poll_id: str) -> list:
-    return [[InlineKeyboardButton("Publish Poll", switch_inline_query=encode_publish_poll(poll_id))],
-            [InlineKeyboardButton("Update Results", callback_data=encode_update_poll_results(poll_id))], 
-            [InlineKeyboardButton("Generate Next Week's Poll", callback_data=encode_generate_next_poll(poll_id))],
-            [InlineKeyboardButton("Delete Poll", callback_data=encode_delete_poll(poll_id))]]
+def get_poll_group_inline_keyboard(group_id: str) -> list:
+    return [[InlineKeyboardButton("Publish Poll", switch_inline_query=encode_publish_poll(group_id))],
+            [InlineKeyboardButton("Update Results", callback_data=encode_update_poll_results(group_id))], 
+            [InlineKeyboardButton("Manage Active Polls", callback_data=encode_manage_active_polls(group_id))],
+            [InlineKeyboardButton("Generate Next Week's Poll", callback_data=encode_generate_next_poll(group_id))],
+            [InlineKeyboardButton("Delete Poll", callback_data=encode_delete_poll(group_id))]]
 
 async def get_end_time(update: Update, context: CustomContext) -> int:
     end_time = update.message.text
@@ -209,10 +210,11 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
 def generate_voting_buttons(polls: list, membership: Membership) -> list:
     keyboard = []
     for i, poll in enumerate(polls):
-        keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
-                                              callback_data=DO_NOTHING)])
-        keyboard.append([InlineKeyboardButton(SIGN_UP_SYMBOL, callback_data=encode_poll_voting(poll.id, membership, True)),
-                         InlineKeyboardButton(DROP_OUT_SYMBOL, callback_data=encode_poll_voting(poll.id, membership, False))])
+        if poll.is_active:
+            keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
+                                                  callback_data=DO_NOTHING)])
+            keyboard.append([InlineKeyboardButton(SIGN_UP_SYMBOL, callback_data=encode_poll_voting(poll.id, membership, True)),
+                            InlineKeyboardButton(DROP_OUT_SYMBOL, callback_data=encode_poll_voting(poll.id, membership, False))])
         
     return keyboard
 
@@ -347,13 +349,58 @@ async def handle_delete_poll_callback(update: Update, context: CustomContext) ->
     # TODO: add confirmation step
     data = update.callback_query.data
     poll_group_id = decode_delete_poll_callback(data)
+    update.callback_query.answer()
     try:
       delete_poll_group(poll_group_id)
       await update.callback_query.edit_message_text("Poll deleted.")
     except PollGroupNotFoundError:
       await update.callback_query.edit_message_text("Poll has been deleted.")
-    finally:
-      await update.callback_query.answer()
+
+def generate_manage_active_polls_buttons(polls, poll_group_id) -> list:
+    keyboard = []
+    for poll in polls:
+        keyboard.append([InlineKeyboardButton(f"{poll.get_title()} {poll.get_active_status_representation()}",
+                                              callback_data=DO_NOTHING)])
+        keyboard.append([InlineKeyboardButton("Activate", callback_data=encode_set_poll_active_status(poll.id, True)),
+                         InlineKeyboardButton("Deactivate", callback_data=encode_set_poll_active_status(poll.id, False))])
+    keyboard.append([InlineKeyboardButton("Back", callback_data=encode_manage_poll_groups(poll_group_id))])
+    return keyboard
+
+async def handle_manage_active_poll_callback(update: Update, context: CustomContext) -> None:
+    user = update.callback_query.from_user
+    logger.info("User %s requested to manage active polls.", user.username)
+    data = update.callback_query.data
+    poll_group_id = decode_manage_active_polls_callback(data)
+    await update.callback_query.answer()
+    try:
+      poll_group = get_poll_group(poll_group_id)
+      polls = get_event_polls(poll_group.get_poll_ids())
+    except PollGroupNotFoundError or PollNotFoundError:
+      await update.callback_query.edit_message_text("Poll has been deleted.")
+      return
+    keyboard = generate_manage_active_polls_buttons(polls, poll_group_id)
+    await update.callback_query.edit_message_text("You can activate/deactivate polls here. Note that it does not affect polls already published.", reply_markup=InlineKeyboardMarkup(keyboard))
+    return ConversationHandler.END
+
+async def handle_change_poll_active_status_callback(update: Update, context: CustomContext) -> None:
+    user = update.callback_query.from_user
+    logger.info("User %s requested to change the poll's active status.", user.username)
+    data = update.callback_query.data
+    poll_id, is_active = decode_set_poll_active_status_callback(data)
+    await update.callback_query.answer()
+    try:
+      poll = get_event_poll(poll_id)
+    except PollNotFoundError:
+      await update.callback_query.edit_message_text("Poll could not be found.")
+      return
+    set_active_status(poll.id, is_active)
+    poll_group = get_poll_group(poll.poll_group_id)
+    polls = get_event_polls(poll_group.get_poll_ids())
+    keyboard = generate_manage_active_polls_buttons(polls, poll_group.id)
+    try:
+      await update.callback_query.edit_message_text("You can activate/deactivate polls here. Note that it does not affect polls already published.", reply_markup=InlineKeyboardMarkup(keyboard))
+    except BadRequest:
+      pass # nothing changes
 
 async def attendance(update: Update, context: CustomContext) -> int:
     await update.message.reply_text(ATTENDANCE_MENU_TEXT)
@@ -422,7 +469,6 @@ conv_handler = ConversationHandler(
         routes["GET_DETAILS"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_details)],
         routes["GET_START_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_start_time)],
         routes["GET_END_TIME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_time)],
-        routes["SELECT_POLL_GROUP"]: [CallbackQueryHandler(poll_title_clicked_callback, pattern="^.+$")],
         routes["GET_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_poll_name)],
         routes["GET_NEW_POLL_NAME"]: [MessageHandler(filters.TEXT & ~filters.COMMAND, create_next_poll)],
     },
@@ -450,7 +496,10 @@ attendance_conv_handler = ConversationHandler(
 application.add_handler(InlineQueryHandler(forward_poll))
 application.add_handler(CallbackQueryHandler(handle_poll_voting_callback, pattern=POLL_VOTING_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_update_results_callback, pattern=UPDATE_POLL_RESULTS_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(handle_manage_active_poll_callback, pattern=MANAGE_ACTIVE_POLLS_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(handle_change_poll_active_status_callback, pattern=SET_POLL_ACTIVE_STATUS_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_delete_poll_callback, pattern=DELETE_POLL_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(poll_title_clicked_callback, pattern=MANAGE_POLL_GROUPS_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern=VIEW_SUMMARY_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(change_status, pattern=MARK_ATTENDANCE_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(do_nothing, pattern=DO_NOTHING_REGEX_STRING))

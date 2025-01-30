@@ -8,6 +8,9 @@ CANCELLATION_SYMBOL = "🚫"
 SIGN_UP_SYMBOL="✅"
 DROP_OUT_SYMBOL="❌"
 
+ACTIVE_SYMBOL = "🟢"
+INACTIVE_SYMBOL = "🔴"
+
 class Membership(Enum):
   REGULAR = 0
   NON_REGULAR = 1
