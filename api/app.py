@@ -362,8 +362,8 @@ def generate_manage_active_polls_buttons(polls, poll_group_id) -> list:
     for poll in polls:
         keyboard.append([InlineKeyboardButton(f"{poll.get_title()} {poll.get_active_status_representation()}",
                                               callback_data=DO_NOTHING)])
-        keyboard.append([InlineKeyboardButton("Activate", callback_data=encode_set_poll_active_status(poll.id, True)),
-                         InlineKeyboardButton("Deactivate", callback_data=encode_set_poll_active_status(poll.id, False))])
+        keyboard.append([InlineKeyboardButton("Unhide", callback_data=encode_set_poll_active_status(poll.id, True)),
+                         InlineKeyboardButton("Hide", callback_data=encode_set_poll_active_status(poll.id, False))])
     keyboard.append([InlineKeyboardButton("Back", callback_data=encode_manage_poll_groups(poll_group_id))])
     return keyboard
 
@@ -380,7 +380,7 @@ async def handle_manage_active_poll_callback(update: Update, context: CustomCont
       await update.callback_query.edit_message_text("Poll has been deleted.")
       return
     keyboard = generate_manage_active_polls_buttons(polls, poll_group_id)
-    await update.callback_query.edit_message_text("You can activate/deactivate polls here. Note that it does not affect polls already published.", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.callback_query.edit_message_text("You can hide/unhide polls here. Note that it does not affect polls already published.", reply_markup=InlineKeyboardMarkup(keyboard))
     return ConversationHandler.END
 
 async def handle_change_poll_active_status_callback(update: Update, context: CustomContext) -> None:
@@ -399,7 +399,7 @@ async def handle_change_poll_active_status_callback(update: Update, context: Cus
     polls = get_event_polls(poll_group.get_poll_ids())
     keyboard = generate_manage_active_polls_buttons(polls, poll_group.id)
     try:
-      await update.callback_query.edit_message_text("You can activate/deactivate polls here. Note that it does not affect polls already published.", reply_markup=InlineKeyboardMarkup(keyboard))
+      await update.callback_query.edit_message_text("You can hide/unhide polls here. Note that it does not affect polls already published.", reply_markup=InlineKeyboardMarkup(keyboard))
     except BadRequest:
       pass # nothing changes
 
