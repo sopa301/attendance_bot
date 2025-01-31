@@ -270,11 +270,12 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
       await update.callback_query.answer()
       return
     is_changed = poll.is_person_status_changed(username, membership, is_sign_up)
+    new_status = "signed up" if is_sign_up else "dropped out"
     if not is_changed:
         logger.info("User %s is clicking the poll buttons like a monkey.", username)
+        await update.callback_query.answer(text=f"You have been {new_status} for {poll.get_title()}.", show_alert=True)
         return
     set_person_in_event(poll_id, username, membership, is_sign_up)
-    new_status = "signed up" if is_sign_up else "dropped out"
     await update.callback_query.answer(text=f"You have been {new_status} for {poll.get_title()}.", show_alert=True)
     poll_group = get_poll_group(poll.poll_group_id)
     polls = get_event_polls(poll_group.get_poll_ids())
