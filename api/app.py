@@ -283,7 +283,7 @@ async def handle_poll_voting_callback(update: Update, context: CustomContext) ->
 
     reply_markup = InlineKeyboardMarkup(generate_voting_buttons(polls, membership))
     try:
-      await update.callback_query.edit_message_text(poll_body, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
+      await context.bot.edit_message_text(text=poll_body, inline_message_id=update.callback_query.inline_message_id, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
     except BadRequest:
       pass # nothing changes
     logger.info("User %s responded to the poll.", user.username)
