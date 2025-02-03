@@ -325,16 +325,17 @@ class AttendanceList():
     (Name)
     """
     lines = message_text.split("\n")
+    lines = [l.strip() for l in lines]
     attendance_list = AttendanceList()
     session_info = []
     last_non_empty_line = 0
-    for i, s in enumerate(lines[:lines.index("Non regulars")]):
+    for i, s in enumerate(lines[:lines.index("Non-Regulars")]):
         if s != "":
             last_non_empty_line = i
         session_info.append(s)
     session_info = session_info[:last_non_empty_line+1]
     attendance_list.details = session_info
-    attendance_list.non_regulars = AttendanceList.parse_section(lines, "Non regulars", "Regulars", Membership.NON_REGULAR)
+    attendance_list.non_regulars = AttendanceList.parse_section(lines, "Non-Regulars", "Regulars", Membership.NON_REGULAR)
     attendance_list.regulars = AttendanceList.parse_section(lines, "Regulars", "Standins", Membership.REGULAR)
     attendance_list.standins = AttendanceList.parse_section(lines, "Standins", "Exco", Membership.NON_REGULAR)
 
