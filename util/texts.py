@@ -12,7 +12,7 @@ ATTENDANCE_MENU_TEXT = "Please select an option:\n" \
         + "/import_from_poll to import a list from a poll\n" \
         + "/view_lists to manage existing lists"
 
-REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT = "Please input the list in the following format: \n\nPickleball session (date)\n\nNon regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
+REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT = "Please input the list in the following format: \n\nPickleball session (date)\n\nNon-Regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2. ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
 
 INFO_TEXT = "This bot is designed to help you manage your weekly events between a regular and non-regular chat. " \
         + "You can create a new poll for your event, take attendance, and view the results of the poll. " \

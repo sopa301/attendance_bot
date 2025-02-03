@@ -238,7 +238,7 @@ class AttendanceList():
         output_list.append(escape_markdown_characters(line))
     output_list.append("")
 
-    output_list.append("Non regulars")
+    output_list.append("Non-Regulars")
     for i, tp in enumerate(self.non_regulars):
       output_list.append(generate_status_string(tp.status, tp.name, i+1))
 
@@ -279,7 +279,7 @@ class AttendanceList():
         output_list.append(line)
     output_list.append("")
 
-    output_list.append("Non regulars")
+    output_list.append("Non-Regulars")
     for i, tp in enumerate(self.non_regulars):
       output_list.append(f"{i+1}. {tp.name}")
 
@@ -309,7 +309,7 @@ class AttendanceList():
     Parses the list in this format: 
     Pickleball session (date)
 
-    Non regulars
+    Non-Regulars
     1. ...
     2. ...
 
