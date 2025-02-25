@@ -479,7 +479,7 @@ conv_handler = ConversationHandler(
 )
 
 attendance_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("attendance", attendance), CommandHandler("summary", summary)],
+    entry_points=[CommandHandler("attendance", attendance), CommandHandler("summary", summary), CommandHandler("attendance_tracking", attendance_tracking)],
     states={
         routes["SELECT_NEW_OR_CONTINUE"]: [CommandHandler("new_list", request_attendance_list),
                                            CommandHandler("view_lists", get_lists),
@@ -506,6 +506,7 @@ application.add_handler(CallbackQueryHandler(poll_title_clicked_callback, patter
 application.add_handler(CallbackQueryHandler(handle_view_attendance_summary, pattern=VIEW_SUMMARY_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(change_status, pattern=MARK_ATTENDANCE_REGEX_STRING))
 application.add_handler(CallbackQueryHandler(do_nothing, pattern=DO_NOTHING_REGEX_STRING))
+application.add_handler(CallbackQueryHandler(handle_view_attendance_tracking, pattern=VIEW_ATTENDANCE_TRACKING_FORMAT_REGEX_STRING))
 
 # Transient conversation handler 
 application.add_handler(conv_handler)

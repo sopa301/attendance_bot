@@ -43,6 +43,13 @@ def generate_inline_keyboard_for_attendance_summaries(attendance_lists: list) ->
                                                     callback_data=encode_view_attendance_summary(attendance_list.id))])
     return inlinekeyboard
 
+def generate_inline_keyboard_for_attendance_tracking_format(attendance_lists: list) -> list:
+    inlinekeyboard = []
+    for attendance_list in attendance_lists:
+        inlinekeyboard.append([InlineKeyboardButton(attendance_list.get_title(),
+                                                    callback_data=encode_view_attendance_tracking_format(attendance_list.id))])
+    return inlinekeyboard
+
 async def get_lists(update: Update, context: CustomContext) -> int:
     """Displays the list of attendance lists."""
     user = update.message.from_user
@@ -220,6 +227,25 @@ async def handle_view_attendance_summary(update: Update, context: CustomContext)
     await update.callback_query.answer()
     summary_text = attendance_list.generate_summary_text()
     await update.callback_query.edit_message_text(summary_text, parse_mode="MarkdownV2")
+    return ConversationHandler.END
+
+async def attendance_tracking(update: Update, context: CustomContext) -> int:
+    """Prints the summary for attendance tracking excel sheet"""
+    logger.info("User requested for the attendance tracking summary.")
+    attendance_lists = get_attendance_lists_by_owner_id(update.message.from_user.id)
+    if len(attendance_lists) == 0:
+        await update.message.reply_text("You have no attendance list yet.")
+        return ConversationHandler.END
+    keyboard = generate_inline_keyboard_for_attendance_tracking_format(attendance_lists)
+    await update.message.reply_text("Please select the attendance list you want to view the attendance tracking format of.", reply_markup=InlineKeyboardMarkup(keyboard))
+    return ConversationHandler.END
+
+async def handle_view_attendance_tracking(update: Update, context: CustomContext) -> int:
+    attendance_list_id = decode_view_attendance_tracking_format(update.callback_query.data)
+    attendance_list = get_attendance_list(attendance_list_id)
+    await update.callback_query.answer()
+    summary_text = attendance_list.generate_attendance_tracking_text()
+    await update.callback_query.edit_message_text(summary_text)
     return ConversationHandler.END
 
 async def change_status(update: Update, context: CustomContext) -> None:

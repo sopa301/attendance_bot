@@ -2,7 +2,7 @@ from enum import Enum
 from datetime import datetime, timedelta
 from typing import List
 
-from util.texts import escape_markdown_characters, generate_status_string, ABSENT, LAST_MINUTE_CANCELLATION
+from util.texts import escape_markdown_characters, generate_status_string, ABSENT, LAST_MINUTE_CANCELLATION, PRESENT
 from util.constants import *
 
 class PollType(Enum):
@@ -254,6 +254,39 @@ class AttendanceList():
       output_list.append("Standins")
       for i, tp in enumerate(self.standins):
         output_list.append(generate_status_string(tp.status, tp.name, i+1))
+
+    return "\n".join(output_list)
+
+  def generate_attendance_tracking_text(self):
+    output_list = []
+    for line in self.details:
+        output_list.append(line)
+    output_list.append("")
+    count = 0
+
+    output_list.append("Regulars")
+    for person in self.regulars:
+      if person.status == PRESENT:
+        output_list.append(f"{person.name}")
+        count += 1
+    for person in self.exco:
+      output_list.append(f"{person}")
+      count += 1
+
+    output_list.append("")
+
+    output_list.append("Non-Regulars")
+    for person in self.non_regulars:
+      if person.status == PRESENT:
+        output_list.append(f"{person.name}")
+        count += 1
+
+    for person in self.standins:
+      if person.status == PRESENT:
+        output_list.append(f"{person.name}")
+        count += 1
+
+    output_list.append(f"\nTotal: {count}")
 
     return "\n".join(output_list)
 

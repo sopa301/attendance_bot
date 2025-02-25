@@ -113,6 +113,15 @@ def decode_manage_attendance_list(encoded: str) -> str:
 def encode_manage_attendance_list(s: str) -> str:
     return "ma," + s
 
+# View attendance tracking format
+VIEW_ATTENDANCE_TRACKING_FORMAT_REGEX_STRING = "^atf_"
+
+def encode_view_attendance_tracking_format(a_l_id: str) -> str:
+    return "atf_" + a_l_id
+
+def decode_view_attendance_tracking_format(encoded: str) -> str:
+    return encoded.split("_")[1]
+
 # # Select poll group for managing attendance
 # SELECT_POLL_GROUP_MANAGE_REGEX_STRING = "^pgm,"
 # def encode_select_poll_group_manage(group_id: str) -> str:
