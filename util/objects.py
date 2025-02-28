@@ -21,7 +21,7 @@ class EventPoll():
     self.non_regulars = []
     self.details = details
     self.type = PollType.WEEKLY
-    self.is_active = True
+    self.is_active = [True, True]
     self.allocations = allocations
     self.poll_group_id = None
 
@@ -60,7 +60,7 @@ class EventPoll():
     poll.non_regulars = dct["non_regulars"]
     poll.type = PollType(dct["type"])
     poll.poll_group_id = dct["poll_group_id"]
-    poll.is_active = dct["is_active"] if "is_active" in dct else True
+    poll.is_active = dct["is_active"] if "is_active" in dct and type(dct["is_active"]) == list else [True, True]
     return poll
   
   def get_people_list_by_membership(self, membership: Membership):
@@ -93,8 +93,8 @@ class EventPoll():
       raise ValueError("Invalid membership: " + membership)
     return is_present != new_sign_up_status
   
-  def get_active_status_representation(self):
-    return ACTIVE_SYMBOL if self.is_active else INACTIVE_SYMBOL
+  def get_active_status_representation(self, membership: Membership):
+    return ACTIVE_SYMBOL if self.is_active[membership.value] else INACTIVE_SYMBOL
 
 # TODO: create the aggregated poll results in the db as well for efficient access.
 # remember to use transactions to ensure that the poll results are consistent
@@ -161,7 +161,7 @@ class PollGroup():
     membership_of_poll = escape_markdown_characters(f"({membership_of_poll})")
     poll_body = [f"*{title} {membership_of_poll}*", ""]
     for i, poll in enumerate(polls):
-        if not bool(poll.is_active):
+        if not bool(poll.is_active[membership.value]):
           continue
         poll_header = poll.generate_poll_details_template()
         poll_body.extend(poll_header)

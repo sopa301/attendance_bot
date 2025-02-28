@@ -47,12 +47,12 @@ def decode_manage_active_polls_callback(query: str) -> str:
 
 # Set poll active status
 SET_POLL_ACTIVE_STATUS_REGEX_STRING = "^sp_"
-def encode_set_poll_active_status(poll_id: str, is_active: bool) -> str:
-    return f"sp_{poll_id}_{1 if is_active else 0}" # 1 for True, 0 for False
+def encode_set_poll_active_status(poll_id: str, membership: Membership, is_active: bool) -> str:
+    return f"sp_{poll_id}_{membership.value}_{1 if is_active else 0}" # 1 for True, 0 for False
 
 def decode_set_poll_active_status_callback(query: str) -> tuple:
-    poll_id, is_active = query.split("_")[1:]
-    return poll_id, bool(int(is_active))
+    poll_id, membership, is_active = query.split("_")[1:]
+    return poll_id, Membership(int(membership)), bool(int(is_active))
 
 # Update poll results
 UPDATE_POLL_RESULTS_REGEX_STRING = "^u_"

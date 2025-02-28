@@ -211,7 +211,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
 def generate_voting_buttons(polls: list, membership: Membership) -> list:
     keyboard = []
     for i, poll in enumerate(polls):
-        if bool(poll.is_active):
+        if bool(poll.is_active[membership.value]):
             keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
                                                   callback_data=DO_NOTHING)])
             keyboard.append([InlineKeyboardButton(SIGN_UP_SYMBOL, callback_data=encode_poll_voting(poll.id, membership, True)),
@@ -237,6 +237,7 @@ async def forward_poll(update: Update, context: CustomContext) -> None:
       poll_group_id = decode_publish_poll_query(query)
       poll_group = get_poll_group(poll_group_id)
       polls = get_event_polls(poll_group.get_poll_ids())
+      # print(polls)
     except (PollGroupNotFoundError, PollNotFoundError, IndexError):
       # TODO: handle this better
       await update.inline_query.answer([])
@@ -362,10 +363,15 @@ async def handle_delete_poll_callback(update: Update, context: CustomContext) ->
 def generate_manage_active_polls_buttons(polls, poll_group_id) -> list:
     keyboard = []
     for poll in polls:
-        keyboard.append([InlineKeyboardButton(f"{poll.get_title()} {poll.get_active_status_representation()}",
+        keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
                                               callback_data=DO_NOTHING)])
-        keyboard.append([InlineKeyboardButton("Unhide", callback_data=encode_set_poll_active_status(poll.id, True)),
-                         InlineKeyboardButton("Hide", callback_data=encode_set_poll_active_status(poll.id, False))])
+        for membership in Membership:
+            keyboard.append([InlineKeyboardButton(f"{membership.to_representation()}{poll.get_active_status_representation(membership)}",
+                                                  callback_data=DO_NOTHING),
+                             InlineKeyboardButton("Unhide",
+                                                  callback_data=encode_set_poll_active_status(poll.id, membership, True)),
+                             InlineKeyboardButton("Hide",
+                                                  callback_data=encode_set_poll_active_status(poll.id, membership, False))])
     keyboard.append([InlineKeyboardButton("Back", callback_data=encode_manage_poll_groups(poll_group_id))])
     return keyboard
 
@@ -389,14 +395,15 @@ async def handle_change_poll_active_status_callback(update: Update, context: Cus
     user = update.callback_query.from_user
     logger.info("User %s requested to change the poll's active status.", user.username)
     data = update.callback_query.data
-    poll_id, is_active = decode_set_poll_active_status_callback(data)
+    poll_id, membership, is_active = decode_set_poll_active_status_callback(data)
     await update.callback_query.answer()
     try:
       poll = get_event_poll(poll_id)
     except PollNotFoundError:
       await update.callback_query.edit_message_text("Poll could not be found.")
       return
-    set_active_status(poll.id, is_active)
+    print(membership.value, membership, is_active)
+    set_active_status(poll.id, membership, is_active)
     poll_group = get_poll_group(poll.poll_group_id)
     polls = get_event_polls(poll_group.get_poll_ids())
     keyboard = generate_manage_active_polls_buttons(polls, poll_group.id)
