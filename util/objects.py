@@ -13,7 +13,7 @@ class PollType(Enum):
 # also handle the updating of all messages when a poll is updated
 # also handle the updating of all messages after the week passes
 class EventPoll():
-  def __init__(self, start_time, end_time, details, allocations):
+  def __init__(self, start_time, end_time, details, allocations, is_active=[True, True]):
     self.id = None
     self.start_time = start_time # start time of event
     self.end_time = end_time
@@ -21,7 +21,7 @@ class EventPoll():
     self.non_regulars = []
     self.details = details
     self.type = PollType.WEEKLY
-    self.is_active = [True, True]
+    self.is_active = is_active
     self.allocations = allocations
     self.poll_group_id = None
 
@@ -134,7 +134,7 @@ class PollGroup():
       new_start_time = new_start_time.isoformat()
       new_end_time = datetime.fromisoformat(poll.end_time) + timedelta(weeks=1)
       new_end_time = new_end_time.isoformat()
-      new_poll = EventPoll(new_start_time, new_end_time, poll.details, poll.allocations)
+      new_poll = EventPoll(new_start_time, new_end_time, poll.details, poll.allocations, is_active=poll.is_active)
       new_polls.append(new_poll)
     return new_polls
   
