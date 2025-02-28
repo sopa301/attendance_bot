@@ -161,7 +161,7 @@ class PollGroup():
     membership_of_poll = escape_markdown_characters(f"({membership_of_poll})")
     poll_body = [f"*{title} {membership_of_poll}*", ""]
     for i, poll in enumerate(polls):
-        if not poll.is_active:
+        if not bool(poll.is_active):
           continue
         poll_header = poll.generate_poll_details_template()
         poll_body.extend(poll_header)

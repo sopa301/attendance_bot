@@ -211,7 +211,7 @@ async def get_end_time(update: Update, context: CustomContext) -> int:
 def generate_voting_buttons(polls: list, membership: Membership) -> list:
     keyboard = []
     for i, poll in enumerate(polls):
-        if poll.is_active:
+        if bool(poll.is_active):
             keyboard.append([InlineKeyboardButton(f"{poll.get_title()}",
                                                   callback_data=DO_NOTHING)])
             keyboard.append([InlineKeyboardButton(SIGN_UP_SYMBOL, callback_data=encode_poll_voting(poll.id, membership, True)),
