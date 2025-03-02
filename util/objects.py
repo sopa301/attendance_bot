@@ -312,7 +312,7 @@ class AttendanceList():
         output_list.append(line)
     output_list.append("")
 
-    output_list.append(escape_markdown_characters("Non-Regulars"))
+    output_list.append("Non-Regulars")
     for i, tp in enumerate(self.non_regulars):
       output_list.append(f"{i+1}. {tp.name}")
 
