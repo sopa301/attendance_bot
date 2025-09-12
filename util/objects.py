@@ -46,10 +46,18 @@ class EventPoll():
   
   @staticmethod
   def format_dt_string(iso_dt: str) -> List[str]:
-    dt = datetime.fromisoformat(iso_dt)
-    dt_string = dt.strftime("%a, %d/%m/%Y_%#I:%M%p").replace(":00", "")
-    date, time, *_ = dt_string.split('_')
-    time = time.lstrip('0')
+    # Parse datetime
+    dt = datetime.strptime(iso_dt, "%Y-%m-%dT%H:%M:%S")
+    
+    # Format date
+    date = dt.strftime("%a, %d/%m/%Y")
+    
+    # Format time in 12-hour format, then manually remove leading zero
+    hour = dt.strftime("%I").lstrip("0")  # hour without leading zero
+    minute = dt.strftime("%M")
+    ampm = dt.strftime("%p").lower()
+    time = f"{hour}:{minute}{ampm}"
+    
     return date, time
 
   @staticmethod
@@ -75,8 +83,8 @@ class EventPoll():
     [_, end_time] = EventPoll.format_dt_string(self.end_time)
     if markdownV2:
       out = []
-      out.append(f"*__Date\: {escape_markdown_characters(start_date)}__*")
-      out.append(f"Time\: {escape_markdown_characters(start_time.lower())} \- {escape_markdown_characters(end_time.lower())}")
+      out.append(f"*__Date\\: {escape_markdown_characters(start_date)}__*")
+      out.append(f"Time\\: {escape_markdown_characters(start_time.lower())} \\- {escape_markdown_characters(end_time.lower())}")
       out.append(f"{escape_markdown_characters(self.details)}")
       return out
     return list((f"Date: {start_date}", f"Time: {start_time.lower()} - {end_time.lower()}", f"{self.details}"))
@@ -167,7 +175,7 @@ class PollGroup():
         poll_body.extend(poll_header)
         lst = poll.get_people_list_by_membership(membership)
         for j, person in enumerate(lst):
-          poll_body.append(f"{j+1}\. {escape_markdown_characters(person)}")
+          poll_body.append(f"{j+1}\\. {escape_markdown_characters(person)}")
         if i < len(polls) - 1:
           poll_body.append("\n")
     poll_body = "\n".join(poll_body)
