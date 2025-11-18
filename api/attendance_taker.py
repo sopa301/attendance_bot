@@ -205,7 +205,7 @@ def generate_inline_keyboard_list_for_edit_list(attendance_list: AttendanceList)
                 InlineKeyboardButton(f"{index+1}. {status_map[person.status]} {person.name}", callback_data=DO_NOTHING),
                 InlineKeyboardButton(PRESENT_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, PRESENT)),
                 InlineKeyboardButton(ABSENT_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, ABSENT)),
-                InlineKeyboardButton(CANCELLATION_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, LAST_MINUTE_CANCELLATION))
+                # InlineKeyboardButton(CANCELLATION_SYMBOL, callback_data=encode_mark_attendance(person.id, attendance_list.id, LAST_MINUTE_CANCELLATION))
             ]
             inlinekeyboard.append(inline_list)
     return inlinekeyboard
