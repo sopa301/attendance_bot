@@ -4,26 +4,52 @@ from typing import List
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
-from model.attendance_list import AttendanceList
-from model.event_poll import EventPoll
-from model.poll_group import PollGroup
-from util.encodings import (
+from model import AttendanceList, EventPoll, PollGroup
+from util import (
+    ABSENT,
+    ABSENT_SYMBOL,
     DO_NOTHING,
+    LAST_MINUTE_CANCELLATION,
+    PRESENT,
+    PRESENT_SYMBOL,
     encode_manage_attendance_list,
     encode_mark_attendance,
     encode_view_attendance_list,
     encode_view_attendance_summary,
     encode_view_attendance_tracking_format,
-)
-from util.texts import (
-    ABSENT,
-    ABSENT_SYMBOL,
-    PRESENT,
-    PRESENT_SYMBOL,
     escape_markdown_characters,
-    generate_status_string,
     status_map,
 )
+
+
+def generate_absent_string(absentee: str, index: int) -> str:
+    """Generates an absent string for the absentee."""
+    absentee = escape_markdown_characters(absentee)
+    return f"{index}\. {ABSENT_SYMBOL}{absentee}"
+
+
+def generate_present_string(presentee: str, index: int) -> str:
+    """Generates a present string for the presentee."""
+    presentee = escape_markdown_characters(presentee)
+    return f"{index}\. {PRESENT_SYMBOL}{presentee}"
+
+
+def generate_last_minute_cancellation_string(cancellation: str, index: int) -> str:
+    """Generates a last minute cancellation string for the cancellation."""
+    cancellation = escape_markdown_characters(cancellation)
+    return f"~{index}\. {cancellation}~"
+
+
+def generate_status_string(status: int, name: str, index: int) -> str:
+    """Generates a status string based on the status."""
+    if status == ABSENT:
+        return generate_absent_string(name, index)
+    elif status == PRESENT:
+        return generate_present_string(name, index)
+    elif status == LAST_MINUTE_CANCELLATION:
+        return generate_last_minute_cancellation_string(name, index)
+    else:
+        raise ValueError("Invalid status")
 
 
 def build_attendance_menu_text() -> str:
@@ -121,9 +147,7 @@ def build_select_poll_to_import_text() -> str:
 
 def build_select_poll_to_import_options(polls: List[EventPoll]) -> list:
     """Builds an inline keyboard for selecting polls to import from."""
-    return _build_inline_keyboard_for_attendance_list_titles(
-        polls, lambda poll: poll.id
-    )
+    return _build_inline_keyboard_for_attendance_list_titles(polls, lambda x: x)
 
 
 def build_attendance_list_not_found_message() -> str:
@@ -134,7 +158,7 @@ def build_attendance_list_not_found_message() -> str:
 def build_manage_attendance_list_text(attendance_list: AttendanceList) -> str:
     """Builds the text for managing an attendance list."""
     return (
-        f"You are managing the attendance list: *{attendance_list.get_title()}*\n\n"
+        f"You are managing the attendance list: *{escape_markdown_characters(attendance_list.get_title())}*\n\n"
         "Please choose an option below:"
     )
 
@@ -274,17 +298,20 @@ def generate_attendance_summary_excel_format_text(
 
 
 async def display_edit_list(attendance_list: AttendanceList, update: Update) -> None:
-    await build_base_edit_list_options(attendance_list, update.message.reply_text)
+    await build_edit_attendance_list_template(
+        attendance_list, update.message.reply_text
+    )
 
 
 async def edit_to_edit_list(attendance_list, update) -> None:
-    await build_base_edit_list_options(
+    await build_edit_attendance_list_template(
         attendance_list, update.callback_query.edit_message_text
     )
 
 
-async def build_base_edit_list_options(attendance_list, fn) -> int:
-    summary_text = attendance_list.generate_summary_text()
+async def build_edit_attendance_list_template(attendance_list, fn) -> int:
+    """Builds the edit attendance list template."""
+    summary_text = build_attendance_list_summary_text(attendance_list)
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
     await fn(
         summary_text + "\n\nPlease edit using the buttons below\.",

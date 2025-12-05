@@ -5,7 +5,7 @@ inline queries and callback queries because they don't have the
 same handlers, so we can reuse some encoding functions.
 """
 
-from util.constants import Membership
+from util import Membership
 
 DO_NOTHING = "."  # For non-interactive buttons
 DO_NOTHING_REGEX_STRING = "^.$"

@@ -332,7 +332,7 @@ def generate_manage_active_polls_buttons(
                 [
                     InlineKeyboardButton(
                         f"{membership.to_representation()}"
-                        f"{poll.get_active_status_representation(membership)}",
+                        f"{get_active_status_representation(poll, membership)}",
                         callback_data=DO_NOTHING,
                     ),
                     InlineKeyboardButton(

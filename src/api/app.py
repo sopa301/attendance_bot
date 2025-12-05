@@ -1,5 +1,7 @@
 """Main application file for the Telegram bot."""
 
+import logging
+
 from flask import Flask, request
 from pymongo import MongoClient
 from telegram import Update
@@ -15,19 +17,15 @@ from telegram.ext import (
     filters,
 )
 
-from api.telegram_util import CustomContext, WebhookUpdate, routes
-from handlers.attendance_handler import AttendanceHandler
-from handlers.general_handler import GeneralHandler
-from handlers.poll_handler import PollHandler
-from repositories.attendance_repository import AttendanceRepository
-from repositories.ban_repository import BanRepository
-from repositories.poll_group_repository import PollGroupRepository
-from repositories.poll_repository import PollRepository
-from services.attendance_service import AttendanceService
-from services.poll_group_service import PollGroupService
-from services.poll_service import PollService
-from util import import_env
-from util.encodings import (
+from handlers import AttendanceHandler, GeneralHandler, PollHandler
+from repositories import (
+    AttendanceRepository,
+    BanRepository,
+    PollGroupRepository,
+    PollRepository,
+)
+from service import AttendanceService, PollGroupService, PollService
+from util import (
     DELETE_POLL_REGEX_STRING,
     DO_NOTHING_REGEX_STRING,
     GENERATE_NEXT_POLL_REGEX_STRING,
@@ -41,7 +39,19 @@ from util.encodings import (
     VIEW_ATTENDANCE_LISTS_REGEX_STRING,
     VIEW_ATTENDANCE_TRACKING_FORMAT_REGEX_STRING,
     VIEW_SUMMARY_REGEX_STRING,
+    CustomContext,
+    WebhookUpdate,
+    import_env,
+    routes,
 )
+
+# Enable logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+# set higher logging level for httpx to avoid all GET and POST requests being logged
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 app = Flask(__name__)
 

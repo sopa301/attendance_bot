@@ -3,21 +3,22 @@ Handlers for attendance-related commands and callbacks.
 """
 
 from telegram import InlineKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram.constants import ParseMode
 from telegram.ext import ConversationHandler
 
-from api.telegram_util import CustomContext, routes
-from model.attendance_list import AttendanceList
-from services.attendance_service import AttendanceService
-from services.poll_group_service import PollGroupService
-from services.poll_service import PollService
-from util.encodings import (
+from model import AttendanceList
+from service import AttendanceService, PollGroupService, PollService
+from util import (
+    CustomContext,
+    PollNotFoundError,
     decode_manage_attendance_list,
     decode_mark_attendance,
     decode_view_attendance_list,
     decode_view_attendance_summary,
     decode_view_attendance_tracking_format,
+    routes,
 )
-from views.attendance_views import (
+from view import (
     REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT,
     build_attendance_list_deleted_message,
     build_attendance_list_logged_and_deleted_message,
@@ -34,6 +35,8 @@ from views.attendance_views import (
     build_manual_edit_attendance_list_repr,
     build_no_attendance_lists_for_import_text,
     build_no_attendance_lists_text,
+    build_poll_group_not_found_message,
+    build_poll_not_found_message,
     build_select_poll_group_to_import_options,
     build_select_poll_group_to_import_text,
     build_select_poll_to_import_options,
@@ -45,7 +48,6 @@ from views.attendance_views import (
     edit_to_edit_list,
     generate_attendance_summary_excel_format_text,
 )
-from views.poll_views import build_poll_group_not_found_message
 
 
 class AttendanceHandler:
@@ -123,9 +125,16 @@ class AttendanceHandler:
     async def handle_select_poll(self, update: Update, _: CustomContext) -> int:
         """Handles the selection of a poll for importing attendance lists."""
         poll_id = update.callback_query.data
-        attendance_list = self.attendance_service.create_attendance_list_from_poll(
-            poll_id, update.message.from_user
-        )
+
+        try:
+            attendance_list = self.attendance_service.create_attendance_list_from_poll(
+                poll_id, update.callback_query.from_user
+            )
+        except PollNotFoundError:
+            await update.callback_query.edit_message_text(
+                build_poll_not_found_message()
+            )
+            return ConversationHandler.END
         await edit_to_edit_list(attendance_list, update)
         return ConversationHandler.END
 
@@ -149,6 +158,7 @@ class AttendanceHandler:
         await update.callback_query.edit_message_text(
             build_manage_attendance_list_text(attendance_list),
             reply_markup=InlineKeyboardMarkup(build_manage_attendance_list_options()),
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return routes["MANAGE_ATTENDANCE_LIST"]
 

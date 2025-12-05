@@ -5,11 +5,11 @@ from typing import List, Tuple
 
 from telegram import User
 
-from model.event_poll import EventPoll
-from model.poll_group import PollGroup
-from repositories.poll_group_repository import PollGroupRepository
-from services.poll_service import PollService
-from util.errors import PollGroupNotFoundError
+from model import EventPoll, PollGroup
+from repositories import PollGroupRepository
+from util import PollGroupNotFoundError
+
+from .poll_service import PollService
 
 
 class PollGroupService:
@@ -20,14 +20,6 @@ class PollGroupService:
     def __init__(
         self, poll_group_repository: PollGroupRepository, poll_service: PollService
     ):
-        # Enable logging
-        logging.basicConfig(
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-        )
-        # set higher logging level for httpx to avoid all GET and POST requests being logged
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-
         self._logger = logging.getLogger(__name__)
         self._poll_group_repository = poll_group_repository
         self._poll_service = poll_service
@@ -82,10 +74,7 @@ class PollGroupService:
         self, group_id: str
     ) -> Tuple[PollGroup | None, List[EventPoll]]:
         """Gets full details of a poll group by its ID."""
-        try:
-            poll_group = self._poll_group_repository.get_poll_group(group_id)
-        except PollGroupNotFoundError:
-            return None, []
+        poll_group = self._poll_group_repository.get_poll_group(group_id)
         polls = self._poll_service.get_event_polls(poll_group.get_poll_ids())
 
         return poll_group, polls

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List
 
-from util.status import Status
+from .status import Status
 
 
 # format for date_time eg: day/month/year,hour:minute

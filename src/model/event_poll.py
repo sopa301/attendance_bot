@@ -1,10 +1,12 @@
 """Model for event polls."""
 
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import List
 
-from util.constants import Membership
-from util.date_time import format_dt_string
+from util import Membership, format_dt_string
+
+from .person import Person
 
 
 class PollType(Enum):
@@ -14,9 +16,6 @@ class PollType(Enum):
     ADHOC = 1
 
 
-# TODO: figure out how to handle old poll messages when the poll group is deleted
-# also handle the updating of all messages when a poll is updated
-# also handle the updating of all messages after the week passes
 class EventPoll:
     """Class representing an event poll."""
 
@@ -74,13 +73,13 @@ class EventPoll:
         )
         return poll
 
-    def get_people_list_by_membership(self, membership: Membership):
+    def get_people_list_by_membership(self, membership: Membership) -> List[Person]:
         """Gets the list of people for the given membership."""
         if membership == Membership.REGULAR:
             return self.regulars
         if membership == Membership.NON_REGULAR:
             return self.non_regulars
-        raise ValueError("Invalid membership: " + membership.value)
+        raise ValueError("Invalid membership: " + membership)
 
     def insert_id(self, new_id):
         "Inserts the given id into the EventPoll object."
@@ -97,3 +96,19 @@ class EventPoll:
         else:
             raise ValueError("Invalid membership: " + membership)
         return is_present != new_sign_up_status
+
+    def generate_next_week_poll(self):
+        """Generates a new EventPoll for the next week with the same details and allocations."""
+        new_start_time = (
+            datetime.fromisoformat(self.start_time) + timedelta(weeks=1)
+        ).isoformat()
+        new_end_time = (
+            datetime.fromisoformat(self.end_time) + timedelta(weeks=1)
+        ).isoformat()
+        return EventPoll(
+            new_start_time,
+            new_end_time,
+            self.details,
+            self.allocations,
+            is_active=self.is_active,
+        )

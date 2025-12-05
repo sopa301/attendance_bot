@@ -1,29 +1,46 @@
-from model.event_poll import EventPoll
-from model.person import Person
-from util.constants import *
-from util.texts import ABSENT, LAST_MINUTE_CANCELLATION
+"""Model for Attendance List."""
+
+from typing import List, Self
+
+from util import (
+    ABSENT,
+    LAST_MINUTE_CANCELLATION,
+    MAX_PEOPLE_PER_SESSION,
+    PENALISE_NON_REGULARS,
+    PENALISE_REGULARS,
+    PENALISE_STANDINS,
+    Membership,
+)
+
+from .event_poll import EventPoll
+from .person import Person
 
 
 class AttendanceList:
-    def __init__(self):
-        self.id = None
-        self.owner_id = None
-        self.details = []
-        self.non_regulars = []
-        self.regulars = []
-        self.exco = []
-        self.standins = []
-        self.reserves = []
+    """Class representing an attendance list."""
 
-    def update_administrative_details(self, old_list):
+    def __init__(self):
+        self.id: str = None
+        self.owner_id: str = None
+        self.details: List[str] = []
+        self.non_regulars: List[Person] = []
+        self.regulars: List[Person] = []
+        self.exco: list = []
+        self.standins: List[Person] = []
+        self.reserves: List[Person] = []
+
+    def update_administrative_details(self, old_list: Self):
+        """Updates administrative details from an old attendance list."""
         self.id = old_list.id
         self.owner_id = old_list.owner_id
         self.reserves = old_list.reserves
 
-    def insert_owner_id(self, owner_id):
+    def insert_owner_id(self, owner_id: str):
+        """Inserts the owner ID for the attendance list."""
         self.owner_id = owner_id
 
     def to_dict(self):
+        """Converts the AttendanceList object to a dictionary."""
         return {
             "id": self.id,
             "owner_id": self.owner_id,
@@ -35,19 +52,16 @@ class AttendanceList:
             "reserves": list(map(lambda x: x.to_dict(), self.reserves)),
         }
 
-    def find_user_by_id(self, id: str):
-        for user in self.non_regulars:
-            if user.id == id:
-                return user
-        for user in self.regulars:
-            if user.id == id:
-                return user
-        for user in self.standins:
-            if user.id == id:
-                return user
-        raise ValueError("User not found with id: " + str(id))
+    def find_user_by_id(self, user_id: str):
+        """Finds a user by their ID."""
+        for lst in [self.non_regulars, self.regulars, self.standins]:
+            for user in lst:
+                if user.id == user_id:
+                    return user
+        raise ValueError("User not found with id: " + str(user_id))
 
-    def get_category_and_index(self, user_id):
+    def get_category_and_index(self, user_id: str):
+        """Gets the category and index of a user by their ID."""
         for user in self.non_regulars:
             if user.id == user_id:
                 return user.membership.to_db_representation(), self.non_regulars.index(
@@ -61,37 +75,34 @@ class AttendanceList:
                 return "standins", self.standins.index(user)
         raise ValueError("User not found with id: " + str(user_id))
 
-    def update_user_status(self, id: int, status: int):
-        user = self.find_user_by_id(id)
+    def update_user_status(self, user_id: str, status: int):
+        """Updates the status of the user with the given id."""
+        user = self.find_user_by_id(user_id)
         user.status = status
 
     def get_title(self):
+        """Gets the title of the attendance list."""
         return self.details[0]
 
     @staticmethod
     def from_dict(dct):
+        """Creates an AttendanceList object from a dictionary."""
         attendance_list = AttendanceList()
         attendance_list.owner_id = dct["owner_id"]
         attendance_list.id = dct["id"]
         attendance_list.details = dct["details"]
-        attendance_list.non_regulars = list(
-            map(lambda x: Person.from_dict(x), dct["non_regulars"])
-        )
-        attendance_list.regulars = list(
-            map(lambda x: Person.from_dict(x), dct["regulars"])
-        )
+        attendance_list.non_regulars = list(map(Person.from_dict, dct["non_regulars"]))
+        attendance_list.regulars = list(map(Person.from_dict, dct["regulars"]))
         attendance_list.exco = dct["exco"]
-        attendance_list.standins = list(
-            map(lambda x: Person.from_dict(x), dct["standins"])
-        )
+        attendance_list.standins = list(map(Person.from_dict, dct["standins"]))
         attendance_list.reserves = (
-            list(map(lambda x: Person.from_dict(x), dct["reserves"]))
-            if "reserves" in dct
-            else []
+            list(map(Person.from_dict, dct["reserves"])) if "reserves" in dct else []
         )
         return attendance_list
 
     def to_parsable_list(self):
+        """Converts the attendance list to a parsable string format.
+        Forms a pair with parse_list()."""
         output_list = []
         for line in self.details:
             output_list.append(line)
@@ -174,6 +185,7 @@ class AttendanceList:
 
     @staticmethod
     def parse_section(lines, divider1, divider2, membership) -> list:
+        """Parses a section of the attendance list between two dividers."""
         lst = []
         for s in lines[lines.index(divider1) + 1 : lines.index(divider2)]:
             if s == "":
@@ -183,10 +195,12 @@ class AttendanceList:
         return lst
 
     def insert_id(self, new_id: str) -> None:
+        """Inserts the ID for the attendance list."""
         self.id = new_id
 
     @staticmethod
     def from_poll(poll: EventPoll, owner_id: str):
+        """Creates an AttendanceList object from an EventPoll and owner ID."""
         attendance_list = AttendanceList()
         attendance_list.owner_id = owner_id
         attendance_list.details = [poll.get_title(), poll.details]
@@ -216,6 +230,7 @@ class AttendanceList:
     def get_non_present_penalisable_names_from_list(
         lst, condition, absent_list, cancelled_list
     ):
+        """Gets non-present penalisable names from a list based on a condition."""
         if not condition:
             return absent_list, cancelled_list
         for person in lst:
@@ -226,6 +241,7 @@ class AttendanceList:
         return absent_list, cancelled_list
 
     def get_non_present_penalisable_names(self):
+        """Gets non-present penalisable names from the attendance list."""
         absent = []
         cancelled = []
         absent, cancelled = self.get_non_present_penalisable_names_from_list(
@@ -240,6 +256,7 @@ class AttendanceList:
         return absent, cancelled
 
     def get_all_player_names(self):
+        """Gets all player names from the attendance list."""
         return (
             list(map(lambda x: x.id, self.non_regulars))
             + list(map(lambda x: x.id, self.regulars))
@@ -247,6 +264,7 @@ class AttendanceList:
         )
 
     def remove_banned_people(self, banned_people):
+        """Removes banned people from the attendance list."""
         removed_non_regulars_count = 0
         removed_regulars_count = 0
         removed_standins_count = 0
@@ -275,6 +293,7 @@ class AttendanceList:
         )
 
     def replenish_numbers(self):
+        """Replenishes the attendance list from reserves if there are vacancies."""
         # do only for non regulars for now
         num_total = len(self.non_regulars) + len(self.regulars) + len(self.standins)
         num_to_replace = MAX_PEOPLE_PER_SESSION - num_total

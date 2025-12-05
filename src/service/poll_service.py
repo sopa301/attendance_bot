@@ -1,12 +1,11 @@
 """Service class for handling poll-related operations."""
 
 import logging
-from datetime import datetime, timedelta
+from typing import List
 
-from model.event_poll import EventPoll
-from repositories.poll_repository import PollRepository
-from util.constants import Membership
-from util.errors import PollNotFoundError
+from model import EventPoll
+from repositories import PollRepository
+from util import Membership
 
 
 class PollService:
@@ -15,14 +14,6 @@ class PollService:
     """
 
     def __init__(self, poll_repository: PollRepository):
-        # Enable logging
-        logging.basicConfig(
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-        )
-        # set higher logging level for httpx to avoid all GET and POST requests being logged
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-
         self.logger = logging.getLogger(__name__)
         self.poll_repository = poll_repository
 
@@ -49,21 +40,13 @@ class PollService:
         """
         Gets multiple event polls by their IDs.
         """
-        try:
-            return self.poll_repository.get_event_polls(polls_ids)
-        except PollNotFoundError as e:
-            self.logger.error("Error getting event polls: %s", e)
-            return []
+        return self.poll_repository.get_event_polls(polls_ids)
 
     def get_event_poll(self, poll_id: str) -> EventPoll | None:
         """
         Gets a single event poll by its ID.
         """
-        try:
-            return self.poll_repository.get_event_poll(poll_id)
-        except PollNotFoundError as e:
-            self.logger.error("Error getting event poll: %s", e)
-            return None
+        return self.poll_repository.get_event_poll(poll_id)
 
     def set_person_in_poll(
         self, poll_id: str, username: str, membership: Membership, is_sign_up: bool
@@ -77,11 +60,8 @@ class PollService:
             poll_id,
             is_sign_up,
         )
-        try:
-            poll = self.poll_repository.get_event_poll(poll_id)
-        except PollNotFoundError as e:
-            self.logger.warning("Error setting person in poll: %s", e)
-            return None
+        poll = self.poll_repository.get_event_poll(poll_id)
+
         is_changed = poll.is_person_status_changed(username, membership, is_sign_up)
         if not is_changed:
             self.logger.info(
@@ -94,26 +74,13 @@ class PollService:
         else:
             self.poll_repository.remove_person_from_poll(poll_id, username, field)
 
-        return poll
+        return self.poll_repository.get_event_poll(poll_id)
 
-    def save_next_polls(self, polls: list):
+    def save_next_polls(self, polls: List[EventPoll]) -> List[EventPoll]:
         """Saves the next week's polls based on the given polls."""
-        new_polls = []
+        new_polls: List[EventPoll] = []
         for poll in polls:
-            new_start_time = datetime.fromisoformat(poll.start_time) + timedelta(
-                weeks=1
-            )
-            new_start_time = new_start_time.isoformat()
-            new_end_time = datetime.fromisoformat(poll.end_time) + timedelta(weeks=1)
-            new_end_time = new_end_time.isoformat()
-            new_poll = EventPoll(
-                new_start_time,
-                new_end_time,
-                poll.details,
-                poll.allocations,
-                is_active=poll.is_active,
-            )
-            new_polls.append(new_poll)
+            new_polls.append(poll.generate_next_week_poll())
         new_ids = self.poll_repository.insert_event_polls(new_polls)
         for i, poll in enumerate(new_polls):
             poll.insert_id(new_ids[i])

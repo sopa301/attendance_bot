@@ -1,5 +1,8 @@
-from util import import_env
+"""Set Telegram webhook to point to the deployed application URL."""
+
 import requests
+
+from src.util import import_env
 
 # import env variables
 env_variables = ["DEPLOYMENT_URL", "BOT_TOKEN"]
@@ -15,24 +18,23 @@ data = {
             "is_bot": False,
             "first_name": "Test",
             "username": "test_user",
-            "language_code": "en"
+            "language_code": "en",
         },
         "chat": {
             "id": 1234567890,  # Same as user ID for private chats
             "first_name": "Test",
             "username": "test_user",
-            "type": "private"
+            "type": "private",
         },
         "date": 1672531200,  # A valid timestamp
-        "text": "/start"
-    }
+        "text": "/start",
+    },
 }
-
 
 
 def set_telegram_webhook():
     url = f"https://api.telegram.org/bot{env_config['BOT_TOKEN']}/setWebhook"
-    webhook_url = env_config["DEPLOYMENT_URL"] 
+    webhook_url = env_config["DEPLOYMENT_URL"]
     payload = {"url": webhook_url}
     response = requests.post(url, json=payload)
     print(response.json())  # Check the response from Telegram
@@ -40,6 +42,7 @@ def set_telegram_webhook():
     # response = requests.post(webhook_url, json=data, headers={"Content-Type": "application/json"})
     # Print response
     # print("Status Code:", response.status_code)
+
 
 if __name__ == "__main__":
     set_telegram_webhook()

@@ -2,16 +2,20 @@
 Handlers for poll-related commands and callbacks.
 """
 
+import logging
+
 from telegram import InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import ConversationHandler
 
-from api.telegram_util import CustomContext, routes
-from services.poll_group_service import PollGroupService
-from services.poll_service import PollService
-from util.date_time import compare_time, parse_dt_to_iso
-from util.encodings import (
+from service import PollGroupService, PollService
+from src.util.errors import PollGroupNotFoundError, PollNotFoundError
+from util import (
+    POLL_GROUP_MANAGEMENT_TEXT,
+    CustomContext,
+    Status,
+    compare_time,
     decode_delete_poll_callback,
     decode_generate_next_poll_callback,
     decode_manage_active_polls_callback,
@@ -20,10 +24,10 @@ from util.encodings import (
     decode_publish_poll_query,
     decode_set_poll_active_status_callback,
     decode_update_poll_results_callback,
+    parse_dt_to_iso,
+    routes,
 )
-from util.status import Status
-from util.texts import POLL_GROUP_MANAGEMENT_TEXT
-from views.poll_views import (
+from view import (
     build_ask_user_to_register_username_message,
     build_cannot_generate_next_poll_message,
     build_cannot_manage_active_polls_message,
@@ -61,6 +65,7 @@ class PollHandler:
     def __init__(self, poll_service: PollService, poll_group_service: PollGroupService):
         self.poll_service = poll_service
         self.poll_group_service = poll_group_service
+        self.logger = logging.getLogger(__name__)
 
     async def get_polls(self, update: Update, _: CustomContext) -> int:
         """Handles the /polls command to list the user's poll groups."""
@@ -218,10 +223,12 @@ class PollHandler:
         """Handles inline queries to forward a poll to another Telegram chat."""
         query = update.inline_query.query
         poll_group_id = decode_publish_poll_query(query)
-        poll_group, polls = self.poll_group_service.get_full_poll_group_details(
-            poll_group_id
-        )
-        if poll_group is None:
+        try:
+            poll_group, polls = self.poll_group_service.get_full_poll_group_details(
+                poll_group_id
+            )
+        except (PollGroupNotFoundError, PollNotFoundError) as e:
+            self.logger.warning("Error fetching poll/poll group details: %s", e)
             await update.inline_query.answer([])
             return
         await update.inline_query.answer(build_publish_options(poll_group, polls))
@@ -241,11 +248,11 @@ class PollHandler:
             return
         username = f"@{user.username}"
 
-        poll = self.poll_service.set_person_in_poll(
-            poll_id, username, membership, is_sign_up
-        )
-
-        if poll is None:
+        try:
+            poll = self.poll_service.set_person_in_poll(
+                poll_id, username, membership, is_sign_up
+            )
+        except PollNotFoundError:
             await update.callback_query.answer(
                 text=build_poll_unable_to_vote_message(), show_alert=True
             )

@@ -4,13 +4,22 @@ from util.constants import Membership
 
 
 class Person:
-    def __init__(self, person_id=None, name=None, status=None, membership=None):
+    """Class representing a person."""
+
+    def __init__(
+        self,
+        person_id: str,
+        name: str,
+        status: int,
+        membership: Membership,
+    ):
         self.id = person_id
         self.name = name
         self.status = status
         self.membership = membership
 
     def to_dict(self):
+        """Converts the Person object to a dictionary."""
         return {
             "id": self.id,
             "name": self.name,
@@ -20,9 +29,7 @@ class Person:
 
     @staticmethod
     def from_dict(dct):
-        person = Person()
-        person.id = dct["id"]
-        person.name = dct["name"]
-        person.status = dct["status"]
-        person.membership = Membership(dct["membership"])
-        return person
+        """Creates a Person object from a dictionary."""
+        return Person(
+            dct["id"], dct["name"], dct["status"], Membership(dct["membership"])
+        )

@@ -5,10 +5,11 @@ from typing import List
 
 from telegram import User
 
-from model.attendance_list import AttendanceList
-from repositories.attendance_repository import AttendanceRepository
-from services.poll_service import PollService
-from util.errors import AttendanceListNotFoundError
+from model import AttendanceList
+from repositories import AttendanceRepository
+from util import AttendanceListNotFoundError
+
+from .poll_service import PollService
 
 
 class AttendanceService:
@@ -19,14 +20,6 @@ class AttendanceService:
     def __init__(
         self, attendance_repository: AttendanceRepository, poll_service: PollService
     ):
-        # Enable logging
-        logging.basicConfig(
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-        )
-        # set higher logging level for httpx to avoid all GET and POST requests being logged
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-
         self.logger = logging.getLogger(__name__)
         self.attendance_repository = attendance_repository
         self.poll_service = poll_service
@@ -44,8 +37,7 @@ class AttendanceService:
         """Create a new attendance list based on a poll ID."""
         self.logger.info("Creating attendance list from poll ID: %s", poll_id)
         poll = self.poll_service.get_event_poll(poll_id)
-        if not poll:
-            return None
+
         attendance_list = AttendanceList.from_poll(poll, user.id)
         attendance_list = self.attendance_repository.insert_attendance_list(
             attendance_list

@@ -1,1 +1,0 @@
-"""Collections package initialization."""

@@ -17,7 +17,7 @@ This project is made to be deployed with Vercel. Instructions to be added.
 
 2. Install dependencies  
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
     ```
 
 3. Create a tunnel to localhost port (5000 by default)
@@ -35,7 +35,7 @@ This project is made to be deployed with Vercel. Instructions to be added.
 5. Run the app
 
    ```bash
-   flask --app api.app run --reload
+   flask --app src.api.app run --reload
    ```
 
 
