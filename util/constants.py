@@ -1,3 +1,5 @@
+"""Constants used across the bot."""
+
 from enum import Enum
 
 # Symbolic constants for the UI
@@ -13,17 +15,22 @@ INACTIVE_SYMBOL = "🔴"
 
 
 class Membership(Enum):
+    """Membership types for poll voters."""
+
     REGULAR = 0
     NON_REGULAR = 1
 
-    @classmethod
+    @staticmethod
     def from_data_string(string):
+        """From callback data from the telegram bot."""
         return Membership(int(string))
 
     def to_representation(self):
-        return "Regular" if self == Membership.REGULAR else "Non-Regulars"
+        """Returns a user-friendly string representation of the membership."""
+        return "Regulars" if self == Membership.REGULAR else "Non-Regulars"
 
     def to_db_representation(self):
+        """Returns the database representation of the membership."""
         return "regulars" if self == Membership.REGULAR else "non_regulars"
 
 
