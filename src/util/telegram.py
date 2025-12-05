@@ -31,7 +31,6 @@ class WebhookUpdate:
 routes = {}
 route_names = [
     "SELECT_NEW_OR_CONTINUE",
-    "INPUT_LIST",
     "VIEW_LIST",
     "SUMMARY",
     "SETTING_STATUS",

@@ -48,6 +48,10 @@ from view import (
     edit_to_edit_list,
     generate_attendance_summary_excel_format_text,
 )
+from view.attendance_views import (
+    build_take_attendance_buttons,
+    build_take_attendance_text,
+)
 
 
 class AttendanceHandler:
@@ -169,7 +173,12 @@ class AttendanceHandler:
         command = decode_manage_attendance_list(update.callback_query.data)
         attendance_list = AttendanceList.from_dict(context.user_data["attendance_list"])
         if command == "take_attendance":
-            await edit_to_edit_list(attendance_list, update)
+            attendance_list_buttons = build_take_attendance_buttons(attendance_list)
+            await update.callback_query.edit_message_text(build_take_attendance_text())
+            for index, msg in enumerate(attendance_list_buttons):
+                await update.callback_query.message.reply_text(
+                    f"Part {index + 1}", reply_markup=InlineKeyboardMarkup(msg)
+                )
             return ConversationHandler.END
         if command == "edit":
             await update.callback_query.edit_message_text(
@@ -304,7 +313,7 @@ class AttendanceHandler:
         )
         return ConversationHandler.END
 
-    async def change_status(self, update: Update, _: CustomContext) -> None:
+    async def change_attendance(self, update: Update, _: CustomContext) -> None:
         """Handles the attendance status of the user."""
         user_id, attendance_list_id, new_status = decode_mark_attendance(
             update.callback_query.data
@@ -318,6 +327,11 @@ class AttendanceHandler:
                 build_attendance_list_not_found_message()
             )
             return ConversationHandler.END
-        await update.callback_query.answer()
-        await edit_to_edit_list(attendance_list, update)
+        attendance_list_buttons = build_take_attendance_buttons(attendance_list)
+        message_text = update.callback_query.message.text
+        index = int(message_text.split("Part ")[1]) - 1
+        await update.callback_query.edit_message_text(
+            message_text,
+            reply_markup=InlineKeyboardMarkup(attendance_list_buttons[index]),
+        )
         return ConversationHandler.END

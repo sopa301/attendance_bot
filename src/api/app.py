@@ -199,12 +199,6 @@ attendance_conv_handler = ConversationHandler(
                 pattern=VIEW_ATTENDANCE_LISTS_REGEX_STRING,
             )
         ],
-        routes["INPUT_LIST"]: [
-            MessageHandler(
-                filters.TEXT & ~filters.COMMAND,
-                attendance_handler.request_attendance_list,
-            )
-        ],
         routes["RECEIVE_EDITED_LIST"]: [
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND,
@@ -264,8 +258,16 @@ application.add_handler(
     )
 )
 application.add_handler(
-    CallbackQueryHandler(
-        attendance_handler.change_status, pattern=MARK_ATTENDANCE_REGEX_STRING
+    ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(
+                attendance_handler.change_attendance,
+                pattern=MARK_ATTENDANCE_REGEX_STRING,
+            )
+        ],
+        states={},
+        fallbacks=[],
+        per_message=True,
     )
 )
 application.add_handler(

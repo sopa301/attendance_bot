@@ -158,7 +158,8 @@ def build_attendance_list_not_found_message() -> str:
 def build_manage_attendance_list_text(attendance_list: AttendanceList) -> str:
     """Builds the text for managing an attendance list."""
     return (
-        f"You are managing the attendance list: *{escape_markdown_characters(attendance_list.get_title())}*\n\n"
+        f"You are managing the attendance list: "
+        f"*{escape_markdown_characters(attendance_list.get_title())}*\n\n"
         "Please choose an option below:"
     )
 
@@ -309,12 +310,39 @@ async def edit_to_edit_list(attendance_list, update) -> None:
     )
 
 
+def build_take_attendance_buttons(
+    attendance_list: AttendanceList,
+    max_rows: int = 20,
+) -> List[List[List[InlineKeyboardButton]]]:
+    """Builds the take attendance buttons that are displayed across
+    multiple messages if necessary."""
+    inline_keyboards = generate_inline_keyboard_list_for_edit_list(attendance_list)
+    chunks = []
+    current = []
+
+    for row in inline_keyboards:
+        if len(current) >= max_rows:
+            chunks.append(current)
+            current = []
+        current.append(row)
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+def build_take_attendance_text() -> str:
+    """Builds the take attendance text."""
+    return "Please take attendance using the buttons below."
+
+
 async def build_edit_attendance_list_template(attendance_list, fn) -> int:
     """Builds the edit attendance list template."""
     summary_text = build_attendance_list_summary_text(attendance_list)
     inlinekeyboard = generate_inline_keyboard_list_for_edit_list(attendance_list)
     await fn(
-        summary_text + "\n\nPlease edit using the buttons below\.",
+        summary_text + "\n\nPlease edit using the buttons below\\.",
         reply_markup=InlineKeyboardMarkup(inlinekeyboard),
         parse_mode="MarkdownV2",
     )
