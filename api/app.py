@@ -1,11 +1,5 @@
 """Main application file for the Telegram bot."""
 
-import logging
-from collections.attendance_repository import AttendanceRepository
-from collections.ban_repository import BanRepository
-from collections.poll_group_repository import PollGroupRepository
-from collections.poll_repository import PollRepository
-
 from flask import Flask, request
 from pymongo import MongoClient
 from telegram import Update
@@ -25,6 +19,10 @@ from api.telegram_util import CustomContext, WebhookUpdate, routes
 from handlers.attendance_handler import AttendanceHandler
 from handlers.general_handler import GeneralHandler
 from handlers.poll_handler import PollHandler
+from repositories.attendance_repository import AttendanceRepository
+from repositories.ban_repository import BanRepository
+from repositories.poll_group_repository import PollGroupRepository
+from repositories.poll_repository import PollRepository
 from services.attendance_service import AttendanceService
 from services.poll_group_service import PollGroupService
 from services.poll_service import PollService
@@ -75,7 +73,7 @@ attendance_repository = AttendanceRepository(attendance_collection)
 ban_repository = BanRepository(bans_collection)
 
 # Define configuration constants
-ADMIN_CHAT_ID = int(env_config["DEVELOPER_CHAT_ID"])
+admin_chat_id = int(env_config["DEVELOPER_CHAT_ID"])
 context_types = ContextTypes(context=CustomContext)
 application = (
     ApplicationBuilder()
@@ -95,7 +93,7 @@ poll_handler = PollHandler(poll_service, poll_group_service)
 attendance_handler = AttendanceHandler(
     attendance_service, poll_group_service, poll_service
 )
-general_handler = GeneralHandler()
+general_handler = GeneralHandler(admin_chat_id)
 
 # register handlers
 general_conv_handler = ConversationHandler(

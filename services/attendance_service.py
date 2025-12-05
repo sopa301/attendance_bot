@@ -1,12 +1,12 @@
 """Service layer for attendance-related operations."""
 
 import logging
-from collections.attendance_repository import AttendanceRepository
 from typing import List
 
 from telegram import User
 
 from model.attendance_list import AttendanceList
+from repositories.attendance_repository import AttendanceRepository
 from services.poll_service import PollService
 from util.errors import AttendanceListNotFoundError
 

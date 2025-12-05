@@ -69,7 +69,7 @@ class EventPoll:
         poll.poll_group_id = dct["poll_group_id"]
         poll.is_active = (
             dct["is_active"]
-            if "is_active" in dct and isinstance(dct["is_active"], List[bool, bool])
+            if "is_active" in dct and isinstance(dct["is_active"], list)
             else [True, True]
         )
         return poll

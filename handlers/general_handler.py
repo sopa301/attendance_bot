@@ -9,7 +9,6 @@ from telegram import ReplyKeyboardRemove, Update
 from telegram.constants import ParseMode
 from telegram.ext import ConversationHandler
 
-from api.app import ADMIN_CHAT_ID
 from api.telegram_util import CustomContext, WebhookUpdate
 from util.texts import CANCEL_TEXT, INFO_TEXT, START_TEXT
 
@@ -17,7 +16,8 @@ from util.texts import CANCEL_TEXT, INFO_TEXT, START_TEXT
 class GeneralHandler:
     """General purpose handler class for the bot."""
 
-    def __init__(self):
+    def __init__(self, admin_chat_id: str):
+        self.admin_chat_id = admin_chat_id
         # Enable logging
         logging.basicConfig(
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -57,7 +57,7 @@ class GeneralHandler:
             f"So far they have sent the following payloads: \n\n• <code>{combined_payloads}</code>"
         )
         await context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID, text=text, parse_mode=ParseMode.HTML
+            chat_id=self.admin_chat_id, text=text, parse_mode=ParseMode.HTML
         )
 
     async def error_handler(self, update: object, context: CustomContext) -> None:
@@ -87,10 +87,10 @@ class GeneralHandler:
 
         # Finally, send the message
         await context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID, text=message, parse_mode=ParseMode.HTML
+            chat_id=self.admin_chat_id, text=message, parse_mode=ParseMode.HTML
         )
         await context.bot.send_message(
-            chat_id=ADMIN_CHAT_ID, text=message2, parse_mode=ParseMode.HTML
+            chat_id=self.admin_chat_id, text=message2, parse_mode=ParseMode.HTML
         )
 
     async def do_nothing(self, update: Update, _: CustomContext) -> None:

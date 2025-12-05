@@ -1,13 +1,13 @@
 """Service class for handling poll-group-related operations."""
 
 import logging
-from collections.poll_group_repository import PollGroupRepository
 from typing import List, Tuple
 
 from telegram import User
 
 from model.event_poll import EventPoll
 from model.poll_group import PollGroup
+from repositories.poll_group_repository import PollGroupRepository
 from services.poll_service import PollService
 from util.errors import PollGroupNotFoundError
 

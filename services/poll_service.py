@@ -1,10 +1,10 @@
 """Service class for handling poll-related operations."""
 
 import logging
-from collections.poll_repository import PollRepository
 from datetime import datetime, timedelta
 
 from model.event_poll import EventPoll
+from repositories.poll_repository import PollRepository
 from util.constants import Membership
 from util.errors import PollNotFoundError
 

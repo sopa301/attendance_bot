@@ -95,7 +95,7 @@ class PollHandler:
         await update.callback_query.edit_message_text(
             build_poll_group_management_message(poll_group),
             reply_markup=InlineKeyboardMarkup(
-                build_poll_group_management_options(poll_group.id)
+                build_poll_group_management_options(poll_group)
             ),
         )
         return ConversationHandler.END
@@ -299,7 +299,7 @@ class PollHandler:
         await update.message.reply_text(
             build_poll_maker_overview_text(new_group, next_polls),
             reply_markup=InlineKeyboardMarkup(
-                build_poll_group_management_options(new_group.id)
+                build_poll_group_management_options(new_group)
             ),
             parse_mode=ParseMode.MARKDOWN_V2,
         )

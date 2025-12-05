@@ -185,17 +185,19 @@ def build_voting_buttons(polls: List[EventPoll], membership: Membership) -> list
     return keyboard
 
 
-def build_publish_options(poll_group: PollGroup, polls: List[EventPoll]) -> list:
+def build_publish_options(
+    poll_group: PollGroup, polls: List[EventPoll]
+) -> List[InlineQueryResultArticle]:
     """Generates inline keyboard buttons for publishing a poll group."""
     lst = []
     for membership in Membership:
-        lst.append([build_publish_option(poll_group, polls, membership)])
+        lst.append(build_publish_option(poll_group, polls, membership))
     return lst
 
 
 def build_publish_option(
     poll_group: PollGroup, polls: List[EventPoll], membership: Membership
-):
+) -> InlineQueryResultArticle:
     """
     Generates an inline query result article for publishing a poll group.
     Contains the poll message text and voting buttons for each poll in the poll group.
@@ -205,7 +207,7 @@ def build_publish_option(
         id=poll_group.id + str(membership.value),
         title=f"({membership.to_representation()}) {poll_group.name}",
         input_message_content=InputTextMessageContent(
-            poll_group.generate_poll_group_text(polls, membership),
+            generate_poll_group_text(poll_group, polls, membership),
             parse_mode=ParseMode.MARKDOWN_V2,
         ),
         reply_markup=reply_markup,
