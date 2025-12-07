@@ -10,6 +10,12 @@ pythonpath = ["src"]
 [tool.isort]
 src_paths = ["src"]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project]
 name = "PickleBot"
 version = "0.1.0"
