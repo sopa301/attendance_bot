@@ -4,8 +4,8 @@ from typing import List
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
-from model import AttendanceList, EventPoll, PollGroup
-from util import (
+from src.model import AttendanceList, EventPoll, PollGroup
+from src.util import (
     ABSENT,
     ABSENT_SYMBOL,
     DO_NOTHING,

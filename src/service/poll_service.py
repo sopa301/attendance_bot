@@ -3,9 +3,9 @@
 import logging
 from typing import List
 
-from model import EventPoll
-from repositories import PollRepository
-from util import Membership
+from src.model import EventPoll
+from src.repositories import PollRepository
+from src.util import Membership
 
 
 class PollService:

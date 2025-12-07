@@ -7,8 +7,8 @@ from typing import List
 from bson import ObjectId
 from pymongo.collection import Collection
 
-from model.poll_group import PollGroup
-from util.errors import PollGroupNotFoundError
+from src.model import PollGroup
+from src.util import PollGroupNotFoundError
 
 
 class PollGroupRepository:

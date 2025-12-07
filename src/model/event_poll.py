@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import List
 
-from util import Membership, format_dt_string
+from src.util import Membership, format_dt_string
 
 from .person import Person
 

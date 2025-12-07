@@ -4,8 +4,8 @@ Note that this isn't currently used."""
 from pymongo import UpdateOne
 from pymongo.collection import Collection
 
-from model.attendance_list import AttendanceList
-from util.constants import (
+from src.model import AttendanceList
+from src.util import (
     ABSENT_POINTS,
     BAN_DURATION_SESSIONS,
     BAN_THRESHOLD,

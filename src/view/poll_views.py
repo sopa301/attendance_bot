@@ -10,18 +10,18 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
-from model.event_poll import EventPoll
-from model.poll_group import PollGroup
-from util.constants import (
+from src.model import EventPoll, PollGroup
+from src.util import (
     ACTIVE_SYMBOL,
+    DATE_FORMAT_TEMPLATE,
+    DETAILS_TEMPLATE,
+    DO_NOTHING,
     DROP_OUT_SYMBOL,
     INACTIVE_SYMBOL,
+    POLL_GROUP_MANAGEMENT_TEXT,
+    POLL_GROUP_TEMPLATE,
     SIGN_UP_SYMBOL,
     Membership,
-)
-from util.date_time import format_dt_string
-from util.encodings import (
-    DO_NOTHING,
     encode_delete_poll,
     encode_generate_next_poll,
     encode_manage_active_polls,
@@ -30,13 +30,8 @@ from util.encodings import (
     encode_publish_poll,
     encode_set_poll_active_status,
     encode_update_poll_results,
-)
-from util.texts import (
-    DATE_FORMAT_TEMPLATE,
-    DETAILS_TEMPLATE,
-    POLL_GROUP_MANAGEMENT_TEXT,
-    POLL_GROUP_TEMPLATE,
     escape_markdown_characters,
+    format_dt_string,
 )
 
 

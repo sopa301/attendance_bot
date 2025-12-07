@@ -5,9 +5,9 @@ from typing import List
 
 from telegram import User
 
-from model import AttendanceList
-from repositories import AttendanceRepository
-from util import AttendanceListNotFoundError
+from src.model import AttendanceList
+from src.repositories import AttendanceRepository
+from src.util import AttendanceListNotFoundError
 
 from .poll_service import PollService
 

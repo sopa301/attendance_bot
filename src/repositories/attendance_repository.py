@@ -5,8 +5,8 @@ Abstraction to store attendances in the database.
 from bson import ObjectId
 from pymongo.collection import Collection
 
-from model.attendance_list import AttendanceList
-from util.errors import AttendanceListNotFoundError
+from src.model import AttendanceList
+from src.util import AttendanceListNotFoundError
 
 
 class AttendanceRepository:

@@ -5,9 +5,9 @@ from typing import List, Tuple
 
 from telegram import User
 
-from model import EventPoll, PollGroup
-from repositories import PollGroupRepository
-from util import PollGroupNotFoundError
+from src.model import EventPoll, PollGroup
+from src.repositories import PollGroupRepository
+from src.util import PollGroupNotFoundError
 
 from .poll_service import PollService
 

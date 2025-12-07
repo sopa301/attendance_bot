@@ -1,6 +1,6 @@
 """TODO: Migrate these to the views folder as they are text templates."""
 
-from util import ABSENT_SYMBOL, CANCELLATION_SYMBOL, PRESENT_SYMBOL
+from .constants import ABSENT_SYMBOL, CANCELLATION_SYMBOL, PRESENT_SYMBOL
 
 START_TEXT = (
     "Hi! I am the attendance bot. Please click:\n"

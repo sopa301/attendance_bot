@@ -9,11 +9,12 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import ConversationHandler
 
-from service import PollGroupService, PollService
-from src.util.errors import PollGroupNotFoundError, PollNotFoundError
-from util import (
+from src.service import PollGroupService, PollService
+from src.util import (
     POLL_GROUP_MANAGEMENT_TEXT,
     CustomContext,
+    PollGroupNotFoundError,
+    PollNotFoundError,
     Status,
     compare_time,
     decode_delete_poll_callback,
@@ -27,7 +28,7 @@ from util import (
     parse_dt_to_iso,
     routes,
 )
-from view import (
+from src.view import (
     build_ask_user_to_register_username_message,
     build_cannot_generate_next_poll_message,
     build_cannot_manage_active_polls_message,

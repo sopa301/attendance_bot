@@ -2,7 +2,7 @@
 
 from typing import List, Self
 
-from util import (
+from src.util import (
     ABSENT,
     LAST_MINUTE_CANCELLATION,
     MAX_PEOPLE_PER_SESSION,

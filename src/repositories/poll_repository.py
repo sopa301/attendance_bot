@@ -7,9 +7,8 @@ from typing import List
 from bson import ObjectId
 from pymongo.collection import Collection
 
-from model.event_poll import EventPoll
-from util.constants import Membership
-from util.errors import PollNotFoundError
+from src.model import EventPoll
+from src.util import Membership, PollNotFoundError
 
 
 class PollRepository:

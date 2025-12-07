@@ -1,6 +1,6 @@
 """Person class representing an individual in a poll or attendance list."""
 
-from util.constants import Membership
+from src.util import Membership
 
 
 class Person:

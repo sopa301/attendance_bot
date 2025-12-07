@@ -6,9 +6,9 @@ from telegram import InlineKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.constants import ParseMode
 from telegram.ext import ConversationHandler
 
-from model import AttendanceList
-from service import AttendanceService, PollGroupService, PollService
-from util import (
+from src.model import AttendanceList
+from src.service import AttendanceService, PollGroupService, PollService
+from src.util import (
     CustomContext,
     PollNotFoundError,
     decode_manage_attendance_list,
@@ -18,7 +18,7 @@ from util import (
     decode_view_attendance_tracking_format,
     routes,
 )
-from view import (
+from src.view import (
     REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT,
     build_attendance_list_deleted_message,
     build_attendance_list_logged_and_deleted_message,
@@ -41,14 +41,12 @@ from view import (
     build_select_poll_group_to_import_text,
     build_select_poll_to_import_options,
     build_select_poll_to_import_text,
+    build_take_attendance_buttons,
+    build_take_attendance_text,
     build_view_attendance_list_text,
     build_view_attendance_summaries_text,
     build_view_attendance_summary_excel_format_text,
     generate_attendance_summary_excel_format_text,
-)
-from view.attendance_views import (
-    build_take_attendance_buttons,
-    build_take_attendance_text,
 )
 
 

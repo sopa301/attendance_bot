@@ -9,7 +9,7 @@ from telegram import ReplyKeyboardRemove, Update
 from telegram.constants import ParseMode
 from telegram.ext import ConversationHandler
 
-from util import CANCEL_TEXT, INFO_TEXT, START_TEXT, CustomContext, WebhookUpdate
+from src.util import CANCEL_TEXT, INFO_TEXT, START_TEXT, CustomContext, WebhookUpdate
 
 
 class GeneralHandler:
