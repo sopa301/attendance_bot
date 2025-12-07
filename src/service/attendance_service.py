@@ -44,13 +44,19 @@ class AttendanceService:
         )
         return attendance_list
 
-    def create_attendance_list(self, attendance_list: AttendanceList) -> AttendanceList:
+    def create_attendance_list(
+        self, attendance_list: AttendanceList, owner_id: str
+    ) -> AttendanceList:
         """Create a new attendance list."""
-        self.logger.info(
-            "Creating a new attendance list for owner ID: %s", attendance_list.owner_id
-        )
+
+        attendance_list.owner_id = owner_id
         attendance_list = self.attendance_repository.insert_attendance_list(
             attendance_list
+        )
+        self.logger.info(
+            "Creating a new attendance list for owner ID %s with ID %s",
+            attendance_list.owner_id,
+            attendance_list.id,
         )
         return attendance_list
 

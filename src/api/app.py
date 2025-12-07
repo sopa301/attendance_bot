@@ -258,7 +258,7 @@ application.add_handler(
     )
 )
 application.add_handler(
-    ConversationHandler(
+    ConversationHandler(  # Wrap in ConversationHandler to use per_message handling
         entry_points=[
             CallbackQueryHandler(
                 attendance_handler.change_attendance,

@@ -304,12 +304,6 @@ async def display_edit_list(attendance_list: AttendanceList, update: Update) -> 
     )
 
 
-async def edit_to_edit_list(attendance_list, update) -> None:
-    await build_edit_attendance_list_template(
-        attendance_list, update.callback_query.edit_message_text
-    )
-
-
 def build_take_attendance_buttons(
     attendance_list: AttendanceList,
     max_rows: int = 20,
@@ -317,19 +311,10 @@ def build_take_attendance_buttons(
     """Builds the take attendance buttons that are displayed across
     multiple messages if necessary."""
     inline_keyboards = generate_inline_keyboard_list_for_edit_list(attendance_list)
-    chunks = []
-    current = []
-
-    for row in inline_keyboards:
-        if len(current) >= max_rows:
-            chunks.append(current)
-            current = []
-        current.append(row)
-
-    if current:
-        chunks.append(current)
-
-    return chunks
+    return [
+        inline_keyboards[i : i + max_rows]
+        for i in range(0, len(inline_keyboards), max_rows)
+    ]
 
 
 def build_take_attendance_text() -> str:

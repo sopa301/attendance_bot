@@ -45,7 +45,6 @@ from view import (
     build_view_attendance_summaries_text,
     build_view_attendance_summary_excel_format_text,
     display_edit_list,
-    edit_to_edit_list,
     generate_attendance_summary_excel_format_text,
 )
 from view.attendance_views import (
@@ -139,7 +138,7 @@ class AttendanceHandler:
                 build_poll_not_found_message()
             )
             return ConversationHandler.END
-        await edit_to_edit_list(attendance_list, update)
+        await self._edit_message_take_attendance_buttons(attendance_list, update)
         return ConversationHandler.END
 
     async def handle_view_attendance_list(
@@ -166,6 +165,28 @@ class AttendanceHandler:
         )
         return routes["MANAGE_ATTENDANCE_LIST"]
 
+    async def _edit_message_take_attendance_buttons(
+        self, attendance_list, update: Update
+    ) -> None:
+        """Displays the take attendance buttons."""
+        attendance_list_buttons = build_take_attendance_buttons(attendance_list)
+        await update.callback_query.edit_message_text(build_take_attendance_text())
+        for index, msg in enumerate(attendance_list_buttons):
+            await update.callback_query.message.reply_text(
+                f"Part {index + 1}", reply_markup=InlineKeyboardMarkup(msg)
+            )
+
+    async def _reply_take_attendance_buttons(
+        self, attendance_list, update: Update
+    ) -> None:
+        """Displays the take attendance buttons."""
+        attendance_list_buttons = build_take_attendance_buttons(attendance_list)
+        await update.message.reply_text(build_take_attendance_text())
+        for index, msg in enumerate(attendance_list_buttons):
+            await update.message.reply_text(
+                f"Part {index + 1}", reply_markup=InlineKeyboardMarkup(msg)
+            )
+
     async def handle_manage_attendance_list(
         self, update: Update, context: CustomContext
     ) -> int:
@@ -173,12 +194,7 @@ class AttendanceHandler:
         command = decode_manage_attendance_list(update.callback_query.data)
         attendance_list = AttendanceList.from_dict(context.user_data["attendance_list"])
         if command == "take_attendance":
-            attendance_list_buttons = build_take_attendance_buttons(attendance_list)
-            await update.callback_query.edit_message_text(build_take_attendance_text())
-            for index, msg in enumerate(attendance_list_buttons):
-                await update.callback_query.message.reply_text(
-                    f"Part {index + 1}", reply_markup=InlineKeyboardMarkup(msg)
-                )
+            await self._edit_message_take_attendance_buttons(attendance_list, update)
             return ConversationHandler.END
         if command == "edit":
             await update.callback_query.edit_message_text(
@@ -219,7 +235,7 @@ class AttendanceHandler:
         attendance_list = self.attendance_service.process_edited_list(
             old_list, attendance_list
         )
-        await display_edit_list(attendance_list, update)
+        await self._reply_take_attendance_buttons(attendance_list, update)
         return ConversationHandler.END
 
     async def request_attendance_list(self, update: Update, _: CustomContext) -> int:
@@ -242,9 +258,9 @@ class AttendanceHandler:
             )
             return routes["RECEIVE_INPUT_LIST"]
         attendance_list = self.attendance_service.create_attendance_list(
-            attendance_list
+            attendance_list, update.message.from_user.id
         )
-        await display_edit_list(attendance_list, update)
+        await self._reply_take_attendance_buttons(attendance_list, update)
         return ConversationHandler.END
 
     async def handle_summary_request(self, update: Update, _: CustomContext) -> int:
@@ -329,9 +345,14 @@ class AttendanceHandler:
             return ConversationHandler.END
         attendance_list_buttons = build_take_attendance_buttons(attendance_list)
         message_text = update.callback_query.message.text
-        index = int(message_text.split("Part ")[1]) - 1
+        index = self._parse_index_from_message_text(message_text)
         await update.callback_query.edit_message_text(
             message_text,
             reply_markup=InlineKeyboardMarkup(attendance_list_buttons[index]),
         )
         return ConversationHandler.END
+
+    def _parse_index_from_message_text(self, message_text: str) -> int:
+        """Parses the index from the message text, assuming it is in the format 'Part X',
+        where X is the index number indexed from 1."""
+        return int(message_text.split("Part ")[1]) - 1
