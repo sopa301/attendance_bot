@@ -17,15 +17,15 @@ from telegram.ext import (
     filters,
 )
 
-from handlers import AttendanceHandler, GeneralHandler, PollHandler
-from repositories import (
+from src.handlers import AttendanceHandler, GeneralHandler, PollHandler
+from src.repositories import (
     AttendanceRepository,
     BanRepository,
     PollGroupRepository,
     PollRepository,
 )
-from service import AttendanceService, PollGroupService, PollService
-from util import (
+from src.service import AttendanceService, PollGroupService, PollService
+from src.util import (
     DELETE_POLL_REGEX_STRING,
     DO_NOTHING_REGEX_STRING,
     GENERATE_NEXT_POLL_REGEX_STRING,

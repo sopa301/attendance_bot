@@ -44,7 +44,6 @@ from view import (
     build_view_attendance_list_text,
     build_view_attendance_summaries_text,
     build_view_attendance_summary_excel_format_text,
-    display_edit_list,
     generate_attendance_summary_excel_format_text,
 )
 from view.attendance_views import (
