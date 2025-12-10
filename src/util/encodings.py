@@ -169,7 +169,7 @@ def encode_view_attendance_summary(a_l_id: str, with_refresh: bool = False) -> s
     return "s_" + a_l_id + ("_r" if with_refresh else "")
 
 
-def decode_view_attendance_summary(encoded: str) -> str:
+def decode_view_attendance_summary(encoded: str) -> tuple[str, bool]:
     """Decode attendance list ID from viewing attendance summary."""
     vals = encoded.split("_")
     return vals[1], len(vals) > 2 and vals[2] == "r"
