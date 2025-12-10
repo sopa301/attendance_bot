@@ -220,7 +220,7 @@ def build_invalid_attendance_list_format_message() -> str:
 REQUEST_FOR_ATTENDANCE_LIST_INPUT_TEXT = (
     "Please input the list in the following format: "
     "\n\nPickleball session (date)\n\nNon-Regulars\n1. ...\n2. ...\n\nRegulars\n1. ...\n2."
-    " ...\n\nStandins\n1. ...\n2. ...\n\nExco\n...\n..."
+    " ..."
 )
 
 
@@ -251,14 +251,23 @@ def build_attendance_list_summary_text(attendance_list: AttendanceList) -> str:
     for i, tp in enumerate(attendance_list.regulars):
         output_list.append(generate_status_string(tp.status, tp.name, i + 1))
 
-    if len(attendance_list.standins) > 0:
-        output_list.append("")
-
-        output_list.append("Standins")
-        for i, tp in enumerate(attendance_list.standins):
-            output_list.append(generate_status_string(tp.status, tp.name, i + 1))
-
     return "\n".join(output_list)
+
+
+def build_refresh_summary_button(
+    attendance_list: AttendanceList,
+) -> List[List[InlineKeyboardButton]]:
+    """Builds the refresh summary button."""
+    return [
+        [
+            InlineKeyboardButton(
+                "Refresh Summary",
+                callback_data=encode_view_attendance_summary(
+                    attendance_list.id, with_refresh=True
+                ),
+            )
+        ]
+    ]
 
 
 def generate_attendance_summary_excel_format_text(
@@ -276,19 +285,11 @@ def generate_attendance_summary_excel_format_text(
         if person.status == PRESENT:
             output_list.append(f"{person.name}")
             count += 1
-    for person in attendance_list.exco:
-        output_list.append(f"{person}")
-        count += 1
 
     output_list.append("")
 
     output_list.append("Non-Regulars")
     for person in attendance_list.non_regulars:
-        if person.status == PRESENT:
-            output_list.append(f"{person.name}")
-            count += 1
-
-    for person in attendance_list.standins:
         if person.status == PRESENT:
             output_list.append(f"{person.name}")
             count += 1
@@ -340,9 +341,8 @@ def generate_inline_keyboard_list_for_edit_list(
     lists = [
         attendance_list.non_regulars,
         attendance_list.regulars,
-        attendance_list.standins,
     ]
-    titles = ["NON REGULARS", "REGULARS", "STANDINS"]
+    titles = ["NON REGULARS", "REGULARS"]
     for index, lst in enumerate(lists):
         if len(lst) > 0:
             inlinekeyboard.append(

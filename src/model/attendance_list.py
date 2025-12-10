@@ -5,10 +5,8 @@ from typing import List, Self
 from src.util import (
     ABSENT,
     LAST_MINUTE_CANCELLATION,
-    MAX_PEOPLE_PER_SESSION,
     PENALISE_NON_REGULARS,
     PENALISE_REGULARS,
-    PENALISE_STANDINS,
     Membership,
 )
 
@@ -25,15 +23,11 @@ class AttendanceList:
         self.details: List[str] = []
         self.non_regulars: List[Person] = []
         self.regulars: List[Person] = []
-        self.exco: list = []
-        self.standins: List[Person] = []
-        self.reserves: List[Person] = []
 
     def update_administrative_details(self, old_list: Self):
         """Updates administrative details from an old attendance list."""
         self.id = old_list.id
         self.owner_id = old_list.owner_id
-        self.reserves = old_list.reserves
 
     def insert_owner_id(self, owner_id: str):
         """Inserts the owner ID for the attendance list."""
@@ -47,14 +41,11 @@ class AttendanceList:
             "details": self.details,
             "non_regulars": list(map(lambda x: x.to_dict(), self.non_regulars)),
             "regulars": list(map(lambda x: x.to_dict(), self.regulars)),
-            "exco": self.exco,
-            "standins": list(map(lambda x: x.to_dict(), self.standins)),
-            "reserves": list(map(lambda x: x.to_dict(), self.reserves)),
         }
 
     def find_user_by_id(self, user_id: str):
         """Finds a user by their ID."""
-        for lst in [self.non_regulars, self.regulars, self.standins]:
+        for lst in [self.non_regulars, self.regulars]:
             for user in lst:
                 if user.id == user_id:
                     return user
@@ -70,9 +61,6 @@ class AttendanceList:
         for user in self.regulars:
             if user.id == user_id:
                 return user.membership.to_db_representation(), self.regulars.index(user)
-        for user in self.standins:
-            if user.id == user_id:
-                return "standins", self.standins.index(user)
         raise ValueError("User not found with id: " + str(user_id))
 
     def update_user_status(self, user_id: str, status: int):
@@ -93,11 +81,6 @@ class AttendanceList:
         attendance_list.details = dct["details"]
         attendance_list.non_regulars = list(map(Person.from_dict, dct["non_regulars"]))
         attendance_list.regulars = list(map(Person.from_dict, dct["regulars"]))
-        attendance_list.exco = dct["exco"]
-        attendance_list.standins = list(map(Person.from_dict, dct["standins"]))
-        attendance_list.reserves = (
-            list(map(Person.from_dict, dct["reserves"])) if "reserves" in dct else []
-        )
         return attendance_list
 
     def to_parsable_list(self):
@@ -118,18 +101,6 @@ class AttendanceList:
         for i, tp in enumerate(self.regulars):
             output_list.append(f"{i+1}. {tp.name}")
 
-        output_list.append("")
-
-        output_list.append("Standins")
-        for i, tp in enumerate(self.standins):
-            output_list.append(f"{i+1}. {tp.name}")
-
-        output_list.append("")
-
-        output_list.append("Exco")
-        for i, tp in enumerate(self.exco):
-            output_list.append(tp)
-
         return "\n".join(output_list)
 
     @staticmethod
@@ -146,12 +117,6 @@ class AttendanceList:
         1. ...
         2. ...
 
-        Standins
-        1. ...
-        2. ...
-
-        Exco
-        (Name)
         """
         lines = message_text.split("\n")
         lines = [l.strip() for l in lines]
@@ -168,18 +133,8 @@ class AttendanceList:
             lines, "Non-Regulars", "Regulars", Membership.NON_REGULAR
         )
         attendance_list.regulars = AttendanceList.parse_section(
-            lines, "Regulars", "Standins", Membership.REGULAR
+            lines, "Regulars", None, Membership.REGULAR
         )
-        attendance_list.standins = AttendanceList.parse_section(
-            lines, "Standins", "Exco", Membership.NON_REGULAR
-        )
-
-        exco = []
-        for s in lines[lines.index("Exco") + 1 :]:
-            if s == "":
-                break
-            exco.append(s)
-        attendance_list.exco = exco
 
         return attendance_list
 
@@ -187,7 +142,8 @@ class AttendanceList:
     def parse_section(lines, divider1, divider2, membership) -> list:
         """Parses a section of the attendance list between two dividers."""
         lst = []
-        for s in lines[lines.index(divider1) + 1 : lines.index(divider2)]:
+        end = len(lines) if divider2 is None else lines.index(divider2)
+        for s in lines[lines.index(divider1) + 1 : end]:
             if s == "":
                 continue
             name = s[s.index(".") + 1 :].strip()
@@ -209,20 +165,13 @@ class AttendanceList:
                 lambda name: Person(name, name, ABSENT, Membership.REGULAR),
                 poll.regulars,
             )
-        )[: poll.allocations[1]]
-        num_regulars = len(attendance_list.regulars)
-        temp = list(
+        )
+        attendance_list.non_regulars = list(
             map(
                 lambda name: Person(name, name, ABSENT, Membership.NON_REGULAR),
                 poll.non_regulars,
             )
         )
-        attendance_list.non_regulars = temp[
-            : max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars)
-        ]
-        attendance_list.reserves = temp[
-            max(poll.allocations[0], MAX_PEOPLE_PER_SESSION - num_regulars) :
-        ]
 
         return attendance_list
 
@@ -250,27 +199,21 @@ class AttendanceList:
         absent, cancelled = self.get_non_present_penalisable_names_from_list(
             self.regulars, PENALISE_REGULARS, absent, cancelled
         )
-        absent, cancelled = self.get_non_present_penalisable_names_from_list(
-            self.standins, PENALISE_STANDINS, absent, cancelled
-        )
         return absent, cancelled
 
     def get_all_player_names(self):
         """Gets all player names from the attendance list."""
-        return (
-            list(map(lambda x: x.id, self.non_regulars))
-            + list(map(lambda x: x.id, self.regulars))
-            + list(map(lambda x: x.id, self.standins))
+        return list(map(lambda x: x.id, self.non_regulars)) + list(
+            map(lambda x: x.id, self.regulars)
         )
 
     def remove_banned_people(self, banned_people):
         """Removes banned people from the attendance list."""
         removed_non_regulars_count = 0
         removed_regulars_count = 0
-        removed_standins_count = 0
         for person in banned_people:
             found = False
-            for category in [self.non_regulars, self.regulars, self.standins]:
+            for category in [self.non_regulars, self.regulars]:
                 for i, tp in enumerate(category):
                     if tp.id == person:
                         found = True
@@ -279,8 +222,6 @@ class AttendanceList:
                             removed_non_regulars_count += 1
                         elif category == self.regulars:
                             removed_regulars_count += 1
-                        elif category == self.standins:
-                            removed_standins_count += 1
                         break
                 if found:
                     break
@@ -289,15 +230,4 @@ class AttendanceList:
         return (
             removed_non_regulars_count,
             removed_regulars_count,
-            removed_standins_count,
         )
-
-    def replenish_numbers(self):
-        """Replenishes the attendance list from reserves if there are vacancies."""
-        # do only for non regulars for now
-        num_total = len(self.non_regulars) + len(self.regulars) + len(self.standins)
-        num_to_replace = MAX_PEOPLE_PER_SESSION - num_total
-        if num_to_replace <= 0:
-            return
-        self.non_regulars.extend(self.reserves[:num_to_replace])
-        self.reserves = self.reserves[num_to_replace:]

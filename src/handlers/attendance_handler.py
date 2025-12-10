@@ -37,6 +37,7 @@ from src.view import (
     build_no_attendance_lists_text,
     build_poll_group_not_found_message,
     build_poll_not_found_message,
+    build_refresh_summary_button,
     build_select_poll_group_to_import_options,
     build_select_poll_group_to_import_text,
     build_select_poll_to_import_options,
@@ -166,8 +167,16 @@ class AttendanceHandler:
         self, attendance_list, update: Update
     ) -> None:
         """Displays the take attendance buttons."""
+        summary_message = build_attendance_list_summary_text(attendance_list)
+        summary_buttons = build_refresh_summary_button(attendance_list)
+        await update.callback_query.edit_message_text(
+            summary_message,
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup(summary_buttons),
+        )
+
         attendance_list_buttons = build_take_attendance_buttons(attendance_list)
-        await update.callback_query.edit_message_text(build_take_attendance_text())
+        await update.callback_query.message.reply_text(build_take_attendance_text())
         for index, msg in enumerate(attendance_list_buttons):
             await update.callback_query.message.reply_text(
                 f"Part {index + 1}", reply_markup=InlineKeyboardMarkup(msg)
@@ -177,6 +186,13 @@ class AttendanceHandler:
         self, attendance_list, update: Update
     ) -> None:
         """Displays the take attendance buttons."""
+        summary_message = build_attendance_list_summary_text(attendance_list)
+        summary_buttons = build_refresh_summary_button(attendance_list)
+        await update.message.reply_text(
+            summary_message,
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup(summary_buttons),
+        )
         attendance_list_buttons = build_take_attendance_buttons(attendance_list)
         await update.message.reply_text(build_take_attendance_text())
         for index, msg in enumerate(attendance_list_buttons):
@@ -282,13 +298,21 @@ class AttendanceHandler:
         self, update: Update, _: CustomContext
     ) -> int:
         """Handles request to view a specific attendance summary."""
-        attendance_list_id = decode_view_attendance_summary(update.callback_query.data)
+        attendance_list_id, with_refresh = decode_view_attendance_summary(
+            update.callback_query.data
+        )
         attendance_list = self.attendance_service.get_attendance_list(
             attendance_list_id
         )
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(
-            build_attendance_list_summary_text(attendance_list), parse_mode="MarkdownV2"
+            build_attendance_list_summary_text(attendance_list),
+            parse_mode="MarkdownV2",
+            reply_markup=(
+                InlineKeyboardMarkup(build_refresh_summary_button(attendance_list))
+                if with_refresh
+                else None
+            ),
         )
         return ConversationHandler.END
 
