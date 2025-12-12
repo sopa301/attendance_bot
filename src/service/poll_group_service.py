@@ -62,13 +62,17 @@ class PollGroupService:
             )
             return None
 
-    def create_poll_group(self, owner_id: int, name: str, polls_ids: List[str]) -> str:
-        """Creates a new poll group and returns its ID."""
+    def create_poll_group(
+        self, owner_id: int, name: str, polls_ids: List[str]
+    ) -> PollGroup:
+        """Creates a new poll group and returns it."""
         self._logger.info(
             "Creating new poll group '%s' for user ID %d.", name, owner_id
         )
         poll_group = PollGroup(owner_id, name, polls_ids)
-        return self._poll_group_repository.insert_poll_group(poll_group)
+        new_id = self._poll_group_repository.insert_poll_group(poll_group)
+        poll_group.insert_id(new_id)
+        return poll_group
 
     def get_full_poll_group_details(
         self, group_id: str
