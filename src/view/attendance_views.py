@@ -185,7 +185,7 @@ def build_manage_attendance_list_options() -> List[List[InlineKeyboardButton]]:
         ],
         [
             InlineKeyboardButton(
-                "Log and Delete",
+                "Log Bans and Delete",
                 callback_data=encode_manage_attendance_list("log_and_delete"),
             )
         ],
