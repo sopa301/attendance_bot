@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import ConversationHandler
 
+from service.telegram_message_updater import TelegramMessageUpdater
 from src.service import PollGroupService, PollService
 from src.util import (
     POLL_GROUP_MANAGEMENT_TEXT,
@@ -63,9 +64,15 @@ from src.view import (
 class PollHandler:
     """Handler class for poll-group-related commands and callbacks."""
 
-    def __init__(self, poll_service: PollService, poll_group_service: PollGroupService):
+    def __init__(
+        self,
+        poll_service: PollService,
+        poll_group_service: PollGroupService,
+        telegram_message_updater: TelegramMessageUpdater,
+    ):
         self.poll_service = poll_service
         self.poll_group_service = poll_group_service
+        self.telegram_message_updater = telegram_message_updater
         self.logger = logging.getLogger(__name__)
 
     async def get_polls(self, update: Update, _: CustomContext) -> int:
@@ -267,17 +274,17 @@ class PollHandler:
         poll_group, polls = self.poll_group_service.get_full_poll_group_details(
             poll.poll_group_id
         )
-        try:
-            await context.bot.edit_message_text(
+        await self.telegram_message_updater.update_message(
+            update.callback_query.inline_message_id,
+            lambda: context.bot.edit_message_text(
                 text=generate_poll_group_text(poll_group, polls, membership),
                 inline_message_id=update.callback_query.inline_message_id,
                 reply_markup=InlineKeyboardMarkup(
                     build_voting_buttons(polls, membership)
                 ),
                 parse_mode=ParseMode.MARKDOWN_V2,
-            )
-        except BadRequest:
-            pass  # nothing changes
+            ),
+        )
 
     async def handle_generate_next_poll_callback(
         self, update: Update, context: CustomContext

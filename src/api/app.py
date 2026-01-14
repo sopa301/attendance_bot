@@ -1,7 +1,9 @@
 """Main application file for the Telegram bot."""
 
 import logging
+import os
 
+from dotenv import dotenv_values
 from flask import Flask, request
 from pymongo import MongoClient
 from telegram import Update
@@ -24,7 +26,12 @@ from src.repositories import (
     PollGroupRepository,
     PollRepository,
 )
-from src.service import AttendanceService, PollGroupService, PollService
+from src.service import (
+    AttendanceService,
+    PollGroupService,
+    PollService,
+    TelegramMessageUpdater,
+)
 from src.util import (
     DELETE_POLL_REGEX_STRING,
     DO_NOTHING_REGEX_STRING,
@@ -40,8 +47,9 @@ from src.util import (
     VIEW_ATTENDANCE_TRACKING_FORMAT_REGEX_STRING,
     VIEW_SUMMARY_REGEX_STRING,
     CustomContext,
+    NoOpDebouncer,
+    RedisDebouncer,
     WebhookUpdate,
-    import_env,
     routes,
 )
 
@@ -56,26 +64,15 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 app = Flask(__name__)
 
 # import env variables
-env_variables = [
-    "DEPLOYMENT_URL",
-    "BOT_TOKEN",
-    "MONGO_URL",
-    "MONGO_DB_NAME",
-    "DEVELOPER_CHAT_ID",
-    "MONGO_POLLS_COLLECTION_NAME",
-    "MONGO_GROUPS_COLLECTION_NAME",
-    "MONGO_ATTENANCES_COLLECTION_NAME",
-    "MONGO_BANS_COLLECTION_NAME",
-]
-env_config = import_env(env_variables)
+env_config = dotenv_values(".env")
 
 # connect to db
-client = MongoClient(env_config["MONGO_URL"])
-db = client[env_config["MONGO_DB_NAME"]]
-polls_collection = db[env_config["MONGO_POLLS_COLLECTION_NAME"]]
-groups_collection = db[env_config["MONGO_GROUPS_COLLECTION_NAME"]]
-attendance_collection = db[env_config["MONGO_ATTENANCES_COLLECTION_NAME"]]
-bans_collection = db[env_config["MONGO_BANS_COLLECTION_NAME"]]
+client = MongoClient(env_config.get("MONGO_URL"))
+db = client[env_config.get("MONGO_DB_NAME")]
+polls_collection = db[env_config.get("MONGO_POLLS_COLLECTION_NAME")]
+groups_collection = db[env_config.get("MONGO_GROUPS_COLLECTION_NAME")]
+attendance_collection = db[env_config.get("MONGO_ATTENANCES_COLLECTION_NAME")]
+bans_collection = db[env_config.get("MONGO_BANS_COLLECTION_NAME")]
 
 poll_repository = PollRepository(polls_collection)
 poll_group_repository = PollGroupRepository(groups_collection)
@@ -83,23 +80,33 @@ attendance_repository = AttendanceRepository(attendance_collection)
 ban_repository = BanRepository(bans_collection)
 
 # Define configuration constants
-admin_chat_id = int(env_config["DEVELOPER_CHAT_ID"])
+admin_chat_id = int(env_config.get("DEVELOPER_CHAT_ID"))
 context_types = ContextTypes(context=CustomContext)
 application = (
     ApplicationBuilder()
-    .token(env_config["BOT_TOKEN"])
+    .token(env_config.get("BOT_TOKEN"))
     .context_types(context_types)
     .build()
 )
 
 # Instantiate services
+try:
+    redis_url = env_config.get("REDIS_URL")
+    debouncer = RedisDebouncer(redis_url=redis_url)
+    logging.info("Using RedisDebouncer")
+except Exception as e:  # pylint: disable=broad-except
+    # we really don't care what the exception is, just log and fallback
+    logging.error("Failed to initialize RedisDebouncer: %s", e)
+    debouncer = NoOpDebouncer()
 poll_service = PollService(poll_repository)
 poll_group_service = PollGroupService(poll_group_repository, poll_service)
 attendance_service = AttendanceService(attendance_repository, poll_service)
 
 
 # Instantiate internal handlers
-poll_handler = PollHandler(poll_service, poll_group_service)
+poll_handler = PollHandler(
+    poll_service, poll_group_service, TelegramMessageUpdater(debouncer)
+)
 attendance_handler = AttendanceHandler(
     attendance_service, poll_group_service, poll_service
 )
