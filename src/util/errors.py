@@ -34,3 +34,27 @@ class AttendanceListNotFoundError(Exception):
         self.attendance_id = attendance_id
         self.message = "Attendance list not found with id: " + attendance_id
         super().__init__(self.message)
+
+
+class UserBannedError(Exception):
+    """
+    Exception raised when a user is banned from performing an action.
+    """
+
+    def __init__(self, username, banned_duration: int):
+        self.username = username
+        self.message = "User is banned with username: " + username
+        self.banned_duration = banned_duration
+        super().__init__(self.message)
+
+
+class ServiceUnavailableError(Exception):
+    """
+    Exception raised when a dependent service is unavailable.
+    """
+
+    def __init__(self, user_id, service_name: str):
+        self.message = (
+            f"Service is unavailable for user ID: {user_id} in service: {service_name}"
+        )
+        super().__init__(self.message)

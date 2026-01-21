@@ -5,7 +5,9 @@ from typing import List
 
 from src.model import EventPoll
 from src.repositories import PollRepository
-from src.util import Membership
+from src.util import Membership, ServiceUnavailableError, UserBannedError
+
+from .ban_service import BanService
 
 
 class PollService:
@@ -13,9 +15,10 @@ class PollService:
     Service class for handling poll-related operations.
     """
 
-    def __init__(self, poll_repository: PollRepository):
+    def __init__(self, poll_repository: PollRepository, ban_service: BanService):
         self.logger = logging.getLogger(__name__)
         self.poll_repository = poll_repository
+        self.ban_service = ban_service
 
     def save_event_polls(self, polls_data: list) -> list:
         """
@@ -48,12 +51,40 @@ class PollService:
         """
         return self.poll_repository.get_event_poll(poll_id)
 
+    def validate_username_for_poll(self, username: str, pollmaker_id: str) -> None:
+        """
+        Validates if a user is banned from voting in polls.
+        Raises UserBannedError if the user is banned.
+        """
+        try:
+            is_user_banned = self.ban_service.is_user_banned(username, pollmaker_id)
+        except ServiceUnavailableError as e:
+            self.logger.error(
+                "Error checking ban status for user %s by %s: %s",
+                username,
+                pollmaker_id,
+                str(e),
+            )
+            return
+        if not is_user_banned:
+            return
+        self.logger.info("User %s is banned from voting by %s", username, pollmaker_id)
+        raise UserBannedError(
+            username, self.ban_service.get_ban_duration(username, pollmaker_id)
+        )
+
     def set_person_in_poll(
-        self, poll_id: str, username: str, membership: Membership, is_sign_up: bool
+        self,
+        poll_id: str,
+        username: str,
+        membership: Membership,
+        is_sign_up: bool,
+        pollmaker_id: str,
     ) -> EventPoll | None:
         """
         Sets a person's sign-up status in a poll. Returns the poll if successful, None otherwise.
         """
+        self.validate_username_for_poll(username, pollmaker_id)
         self.logger.info(
             "Setting sign-up status for user %s in poll %s to %s.",
             username,

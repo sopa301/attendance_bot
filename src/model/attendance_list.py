@@ -2,13 +2,7 @@
 
 from typing import List, Self
 
-from src.util import (
-    ABSENT,
-    LAST_MINUTE_CANCELLATION,
-    PENALISE_NON_REGULARS,
-    PENALISE_REGULARS,
-    Membership,
-)
+from src.util import ABSENT, PENALISE_NON_REGULARS, PENALISE_REGULARS, Membership
 
 from .event_poll import EventPoll
 from .person import Person
@@ -76,7 +70,7 @@ class AttendanceList:
     def from_dict(dct):
         """Creates an AttendanceList object from a dictionary."""
         attendance_list = AttendanceList()
-        attendance_list.owner_id = dct["owner_id"]
+        attendance_list.owner_id = str(dct["owner_id"])
         attendance_list.id = dct["id"]
         attendance_list.details = dct["details"]
         attendance_list.non_regulars = list(map(Person.from_dict, dct["non_regulars"]))
@@ -176,30 +170,25 @@ class AttendanceList:
         return attendance_list
 
     @staticmethod
-    def get_non_present_penalisable_names_from_list(
-        lst, condition, absent_list, cancelled_list
-    ):
+    def get_non_present_penalisable_names_from_list(lst, condition, absent_list):
         """Gets non-present penalisable names from a list based on a condition."""
         if not condition:
-            return absent_list, cancelled_list
+            return absent_list
         for person in lst:
             if person.status == ABSENT:
                 absent_list.append(person.id)
-            elif person.status == LAST_MINUTE_CANCELLATION:
-                cancelled_list.append(person.id)
-        return absent_list, cancelled_list
+        return absent_list
 
-    def get_non_present_penalisable_names(self):
+    def get_penalisable_names(self):
         """Gets non-present penalisable names from the attendance list."""
         absent = []
-        cancelled = []
-        absent, cancelled = self.get_non_present_penalisable_names_from_list(
-            self.non_regulars, PENALISE_NON_REGULARS, absent, cancelled
+        absent = self.get_non_present_penalisable_names_from_list(
+            self.non_regulars, PENALISE_NON_REGULARS, absent
         )
-        absent, cancelled = self.get_non_present_penalisable_names_from_list(
-            self.regulars, PENALISE_REGULARS, absent, cancelled
+        absent = self.get_non_present_penalisable_names_from_list(
+            self.regulars, PENALISE_REGULARS, absent
         )
-        return absent, cancelled
+        return absent
 
     def get_all_player_names(self):
         """Gets all player names from the attendance list."""

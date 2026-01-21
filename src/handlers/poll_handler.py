@@ -16,6 +16,7 @@ from src.util import (
     PollGroupNotFoundError,
     PollNotFoundError,
     Status,
+    UserBannedError,
     compare_time,
     decode_delete_poll_callback,
     decode_generate_next_poll_callback,
@@ -54,6 +55,7 @@ from src.view import (
     build_publish_options,
     build_select_poll_group_message,
     build_select_poll_group_options,
+    build_user_banned_message,
     build_voting_buttons,
     generate_manage_active_polls_buttons,
     generate_poll_group_text,
@@ -224,6 +226,9 @@ class PollHandler:
         """Handles inline queries to forward a poll to another Telegram chat."""
         query = update.inline_query.query
         poll_group_id = decode_publish_poll_query(query)
+        if not poll_group_id:
+            await update.inline_query.answer([])
+            return
         try:
             poll_group, polls = self.poll_group_service.get_full_poll_group_details(
                 poll_group_id
@@ -240,7 +245,9 @@ class PollHandler:
         """Handles the callback when a user votes in a poll."""
         user = update.callback_query.from_user
         query = update.callback_query.data
-        poll_id, membership, is_sign_up = decode_poll_voting_callback(query)
+        poll_id, membership, is_sign_up, pollmaker_id = decode_poll_voting_callback(
+            query
+        )
         if user.username is None:
             await update.callback_query.answer(
                 text=build_ask_user_to_register_username_message(),
@@ -251,11 +258,16 @@ class PollHandler:
 
         try:
             poll = self.poll_service.set_person_in_poll(
-                poll_id, username, membership, is_sign_up
+                poll_id, username, membership, is_sign_up, pollmaker_id
             )
         except PollNotFoundError:
             await update.callback_query.answer(
                 text=build_poll_unable_to_vote_message(), show_alert=True
+            )
+            return
+        except UserBannedError as e:
+            await update.callback_query.answer(
+                text=build_user_banned_message(e.banned_duration), show_alert=True
             )
             return
         await update.callback_query.answer(
@@ -272,7 +284,7 @@ class PollHandler:
                 text=generate_poll_group_text(poll_group, polls, membership),
                 inline_message_id=update.callback_query.inline_message_id,
                 reply_markup=InlineKeyboardMarkup(
-                    build_voting_buttons(polls, membership)
+                    build_voting_buttons(polls, membership, pollmaker_id)
                 ),
                 parse_mode=ParseMode.MARKDOWN_V2,
             )

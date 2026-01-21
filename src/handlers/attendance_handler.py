@@ -7,7 +7,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ConversationHandler
 
 from src.model import AttendanceList
-from src.service import AttendanceService, PollGroupService, PollService
+from src.service import AttendanceService, BanService, PollGroupService, PollService
 from src.util import (
     CustomContext,
     PollNotFoundError,
@@ -59,10 +59,12 @@ class AttendanceHandler:
         attendance_service: AttendanceService,
         poll_group_service: PollGroupService,
         poll_service: PollService,
+        ban_service: BanService,
     ):
         self.attendance_service = attendance_service
         self.poll_group_service = poll_group_service
         self.poll_service = poll_service
+        self.ban_service = ban_service
 
     async def attendance(self, update: Update, _: CustomContext) -> int:
         """Entry point for attendance management."""
@@ -224,7 +226,9 @@ class AttendanceHandler:
             )
             return ConversationHandler.END
         if command == "log_and_delete":
-            # log_bans(attendance_list)
+            self.ban_service.log_bans(
+                attendance_list, update.callback_query.from_user.id
+            )
             self.attendance_service.delete_attendance_list(attendance_list.id)
             await update.callback_query.edit_message_text(
                 build_attendance_list_logged_and_deleted_message()

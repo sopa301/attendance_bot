@@ -156,7 +156,9 @@ def build_end_time_before_start_time_message() -> str:
     )
 
 
-def build_voting_buttons(polls: List[EventPoll], membership: Membership) -> list:
+def build_voting_buttons(
+    polls: List[EventPoll], membership: Membership, pollmaker_id: str
+) -> list:
     """Generates inline keyboard buttons for voting on polls."""
     keyboard = []
     for _, poll in enumerate(polls):
@@ -168,11 +170,15 @@ def build_voting_buttons(polls: List[EventPoll], membership: Membership) -> list
                 [
                     InlineKeyboardButton(
                         SIGN_UP_SYMBOL,
-                        callback_data=encode_poll_voting(poll.id, membership, True),
+                        callback_data=encode_poll_voting(
+                            poll.id, membership, True, pollmaker_id
+                        ),
                     ),
                     InlineKeyboardButton(
                         DROP_OUT_SYMBOL,
-                        callback_data=encode_poll_voting(poll.id, membership, False),
+                        callback_data=encode_poll_voting(
+                            poll.id, membership, False, pollmaker_id
+                        ),
                     ),
                 ]
             )
@@ -186,18 +192,25 @@ def build_publish_options(
     """Generates inline keyboard buttons for publishing a poll group."""
     lst = []
     for membership in Membership:
-        lst.append(build_publish_option(poll_group, polls, membership))
+        lst.append(
+            build_publish_option(poll_group, polls, membership, poll_group.owner_id)
+        )
     return lst
 
 
 def build_publish_option(
-    poll_group: PollGroup, polls: List[EventPoll], membership: Membership
+    poll_group: PollGroup,
+    polls: List[EventPoll],
+    membership: Membership,
+    pollmaker_id: str,
 ) -> InlineQueryResultArticle:
     """
     Generates an inline query result article for publishing a poll group.
     Contains the poll message text and voting buttons for each poll in the poll group.
     """
-    reply_markup = InlineKeyboardMarkup(build_voting_buttons(polls, membership))
+    reply_markup = InlineKeyboardMarkup(
+        build_voting_buttons(polls, membership, pollmaker_id)
+    )
     return InlineQueryResultArticle(
         id=poll_group.id + str(membership.value),
         title=f"({membership.to_representation()}) {poll_group.name}",
@@ -220,6 +233,28 @@ def build_ask_user_to_register_username_message() -> str:
 def build_poll_unable_to_vote_message() -> str:
     """Builds the bot message when unable to vote in a poll."""
     return "Poll has been closed or does not exist."
+
+
+def build_user_banned_message(duration: int) -> str:
+    """Builds the bot message when a user is banned."""
+    units = [
+        ("day", 86400),
+        ("hour", 3600),
+        ("minute", 60),
+    ]
+
+    parts = []
+    remaining = duration
+
+    for name, seconds in units:
+        value, remaining = divmod(remaining, seconds)
+        if value:
+            parts.append(f"{value} {name}{'s' if value != 1 else ''}")
+
+    if not parts:
+        return "You are banned from voting."
+
+    return f"You are banned from voting for {', '.join(parts)}."
 
 
 def build_poll_vote_confirmation_message(poll_title: str, is_sign_up: bool) -> str:

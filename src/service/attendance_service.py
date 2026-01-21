@@ -9,6 +9,7 @@ from src.model import AttendanceList
 from src.repositories import AttendanceRepository
 from src.util import AttendanceListNotFoundError
 
+from .ban_service import BanService
 from .poll_service import PollService
 
 
@@ -18,11 +19,15 @@ class AttendanceService:
     """
 
     def __init__(
-        self, attendance_repository: AttendanceRepository, poll_service: PollService
+        self,
+        attendance_repository: AttendanceRepository,
+        poll_service: PollService,
+        ban_service: BanService,
     ):
         self.logger = logging.getLogger(__name__)
         self.attendance_repository = attendance_repository
         self.poll_service = poll_service
+        self.ban_service = ban_service
 
     def get_attendance_lists_by_owner_id(self, owner_id: str) -> List[AttendanceList]:
         """Retrieve all attendance lists owned by a specific user."""
@@ -38,7 +43,16 @@ class AttendanceService:
         self.logger.info("Creating attendance list from poll ID: %s", poll_id)
         poll = self.poll_service.get_event_poll(poll_id)
 
-        attendance_list = AttendanceList.from_poll(poll, user.id)
+        attendance_list = AttendanceList.from_poll(poll, str(user.id))
+        attendance_list, removed = self.ban_service.remove_banned_people(
+            attendance_list, str(user.id)
+        )
+        self.logger.info(
+            "Creating attendance list from poll ID: %s for user ID: %s. Removed %d banned users.",
+            poll_id,
+            user.id,
+            len(removed),
+        )
         attendance_list = self.attendance_repository.insert_attendance_list(
             attendance_list
         )

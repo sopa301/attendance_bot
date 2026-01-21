@@ -23,7 +23,10 @@ def encode_publish_poll(poll_id: str) -> str:
 
 def decode_publish_poll_query(query: str) -> str:
     """Decode poll ID from publishing a poll query."""
-    return query.split("_")[1]
+    lst = query.split("_")
+    if len(lst) != 2:
+        return ""
+    return lst[1]
 
 
 ## Callback Queries
@@ -119,15 +122,29 @@ def decode_delete_poll_callback(query: str) -> str:
 POLL_VOTING_REGEX_STRING = "^v_"
 
 
-def encode_poll_voting(poll_id: str, membership: Membership, is_sign_up: bool) -> str:
-    """Encode poll ID, membership, and sign-up status for poll voting."""
-    return f"v_{membership.value}_{poll_id}_{1 if is_sign_up else 0}"  # 1 for True, 0 for False
+def encode_poll_voting(
+    poll_id: str, membership: Membership, is_sign_up: bool, pollmaker_id: str
+) -> str:
+    """Encode poll ID, membership, sign-up status and pollmaker ID for poll voting."""
+    return f"v_{membership.value}_{poll_id}_{1 if is_sign_up else 0}_{pollmaker_id}"  # 1 for True, 0 for False
 
 
 def decode_poll_voting_callback(query: str) -> tuple:
-    """Decode poll ID, membership, and sign-up status from poll voting callback."""
-    membership, poll_id, is_sign_up = query.split("_")[1:]
-    return poll_id, Membership.from_data_string(membership), bool(int(is_sign_up))
+    """Decode poll ID, membership, sign-up status and pollmaker ID from poll voting callback."""
+    results = query.split("_")[1:]
+    if len(results) == 3:
+        return (
+            results[1],
+            Membership.from_data_string(results[0]),
+            bool(int(results[2])),
+            None,
+        )
+    return (
+        results[1],
+        Membership.from_data_string(results[0]),
+        bool(int(results[2])),
+        results[3],
+    )
 
 
 # View attendance lists
@@ -203,18 +220,15 @@ def decode_view_attendance_tracking_format(encoded: str) -> str:
     return encoded.split("_")[1]
 
 
-# # Select poll group for managing attendance
-# SELECT_POLL_GROUP_MANAGE_REGEX_STRING = "^pgm,"
-# def encode_select_poll_group_manage(group_id: str) -> str:
-#     return "pgm," + group_id
+# Unban user
+UNBAN_USER_REGEX_STRING = "^unb_"
 
-# def decode_select_poll_group_manage(encoded: str) -> str:
-#     return encoded.split(",")[1]
 
-# # Select poll group for importing attendance list
-# SELECT_POLL_GROUP_IMPORT_REGEX_STRING = "^pgi,"
-# def encode_select_poll_group_import(group_id: str) -> str:
-#     return "pgi," + group_id
+def encode_unban_user(user_id: str) -> str:
+    """Encode user ID for unbanning a user."""
+    return "unb_" + user_id
 
-# def decode_select_poll_group_import(encoded: str) -> str:
-#     return encoded.split(",")[1]
+
+def decode_unban_user(encoded: str) -> str:
+    """Decode user ID from unbanning a user."""
+    return encoded.split("_")[1]

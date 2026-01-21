@@ -33,6 +33,9 @@ class AttendanceRepository:
     def get_attendance_lists_by_owner_id(self, owner_id):
         """Retrieve all attendance lists owned by a specific user."""
         attendance_jsons = list(self.collection.find({"owner_id": owner_id}))
+        attendance_jsons.extend(
+            self.collection.find({"owner_id": str(owner_id)})
+        )  # in case owner_id is stored as str
         attendance_lists = list(map(AttendanceList.from_dict, attendance_jsons))
         for i, attendance in enumerate(attendance_lists):
             attendance.insert_id(str(attendance_jsons[i]["_id"]))
@@ -48,7 +51,7 @@ class AttendanceRepository:
             {"$set": {f"{category}.{index}.status": new_status}},
         )
 
-    def put_attendance_list(self, attendance_id, attendance_list):
+    def put_attendance_list(self, attendance_id, attendance_list: AttendanceList):
         """Update an entire attendance list in the database."""
         return self.collection.update_one(
             {"_id": ObjectId(attendance_id)}, {"$set": attendance_list.to_dict()}

@@ -7,7 +7,7 @@ It's still in development.
 Live demo [here](https://telegram.me/nuspicklebot).
 
 ### Hosting
-This project is made to be deployed with Vercel. Instructions to be added.
+This project is made to be deployed with Vercel. Requires MongoDB and Redis. Instructions to be added.
 
 
 ### Running locally

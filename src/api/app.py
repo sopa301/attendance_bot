@@ -17,14 +17,14 @@ from telegram.ext import (
     filters,
 )
 
-from src.handlers import AttendanceHandler, GeneralHandler, PollHandler
+from src.handlers import AttendanceHandler, BanHandler, GeneralHandler, PollHandler
 from src.repositories import (
     AttendanceRepository,
     BanRepository,
     PollGroupRepository,
     PollRepository,
 )
-from src.service import AttendanceService, PollGroupService, PollService
+from src.service import AttendanceService, BanService, PollGroupService, PollService
 from src.util import (
     DELETE_POLL_REGEX_STRING,
     DO_NOTHING_REGEX_STRING,
@@ -35,6 +35,7 @@ from src.util import (
     MARK_ATTENDANCE_REGEX_STRING,
     POLL_VOTING_REGEX_STRING,
     SET_POLL_ACTIVE_STATUS_REGEX_STRING,
+    UNBAN_USER_REGEX_STRING,
     UPDATE_POLL_RESULTS_REGEX_STRING,
     VIEW_ATTENDANCE_LISTS_REGEX_STRING,
     VIEW_ATTENDANCE_TRACKING_FORMAT_REGEX_STRING,
@@ -66,6 +67,7 @@ env_variables = [
     "MONGO_GROUPS_COLLECTION_NAME",
     "MONGO_ATTENANCES_COLLECTION_NAME",
     "MONGO_BANS_COLLECTION_NAME",
+    "REDIS_URL",
 ]
 env_config = import_env(env_variables)
 
@@ -75,12 +77,12 @@ db = client[env_config["MONGO_DB_NAME"]]
 polls_collection = db[env_config["MONGO_POLLS_COLLECTION_NAME"]]
 groups_collection = db[env_config["MONGO_GROUPS_COLLECTION_NAME"]]
 attendance_collection = db[env_config["MONGO_ATTENANCES_COLLECTION_NAME"]]
-bans_collection = db[env_config["MONGO_BANS_COLLECTION_NAME"]]
+
 
 poll_repository = PollRepository(polls_collection)
 poll_group_repository = PollGroupRepository(groups_collection)
 attendance_repository = AttendanceRepository(attendance_collection)
-ban_repository = BanRepository(bans_collection)
+ban_repository = BanRepository(env_config["REDIS_URL"])
 
 # Define configuration constants
 admin_chat_id = int(env_config["DEVELOPER_CHAT_ID"])
@@ -93,16 +95,18 @@ application = (
 )
 
 # Instantiate services
-poll_service = PollService(poll_repository)
+ban_service = BanService(ban_repository)
+poll_service = PollService(poll_repository, ban_service)
 poll_group_service = PollGroupService(poll_group_repository, poll_service)
-attendance_service = AttendanceService(attendance_repository, poll_service)
+attendance_service = AttendanceService(attendance_repository, poll_service, ban_service)
 
 
 # Instantiate internal handlers
 poll_handler = PollHandler(poll_service, poll_group_service)
 attendance_handler = AttendanceHandler(
-    attendance_service, poll_group_service, poll_service
+    attendance_service, poll_group_service, poll_service, ban_service
 )
+ban_handler = BanHandler(ban_service)
 general_handler = GeneralHandler(admin_chat_id)
 
 # register handlers
@@ -215,6 +219,12 @@ attendance_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", general_handler.cancel)],
 )
 
+ban_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("bans", ban_handler.get_bans)],
+    states={},
+    fallbacks=[CommandHandler("cancel", general_handler.cancel)],
+)
+
 # Always-active request handlers
 application.add_handler(InlineQueryHandler(poll_handler.forward_poll))
 application.add_handler(
@@ -279,11 +289,15 @@ application.add_handler(
         pattern=VIEW_ATTENDANCE_TRACKING_FORMAT_REGEX_STRING,
     )
 )
+application.add_handler(
+    CallbackQueryHandler(ban_handler.unban_user, pattern=UNBAN_USER_REGEX_STRING)
+)
 
 # Transient conversation handler
 application.add_handler(general_conv_handler)
 application.add_handler(poll_conv_handler)
 application.add_handler(attendance_conv_handler)
+application.add_handler(ban_conv_handler)
 
 
 # Misc handlers

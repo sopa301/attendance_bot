@@ -15,7 +15,10 @@ class PollServiceTest(unittest.TestCase):
 
     def setUp(self):
         self.repo = MagicMock()
-        self.service = PollService(self.repo)
+        self.ban_service = MagicMock()
+        self.ban_service.get_ban_duration.return_value = 0
+        self.ban_service.is_user_banned.return_value = False
+        self.service = PollService(self.repo, self.ban_service)
 
     def test_save_event_polls(self):
         polls_data = [
@@ -74,7 +77,7 @@ class PollServiceTest(unittest.TestCase):
 
         self.repo.get_event_poll.return_value = poll
 
-        result = self.service.set_person_in_poll("id1", "john", membership, True)
+        result = self.service.set_person_in_poll("id1", "john", membership, True, "1")
         self.assertEqual(result, poll)
         self.repo.add_person_to_poll.assert_not_called()
 
@@ -86,7 +89,7 @@ class PollServiceTest(unittest.TestCase):
 
         self.repo.get_event_poll.return_value = poll
 
-        result = self.service.set_person_in_poll("id1", "john", membership, True)
+        result = self.service.set_person_in_poll("id1", "john", membership, True, "1")
 
         self.repo.add_person_to_poll.assert_called_once_with("id1", "john", "db_field")
         self.assertEqual(result, poll)
@@ -99,7 +102,7 @@ class PollServiceTest(unittest.TestCase):
 
         self.repo.get_event_poll.return_value = poll
 
-        result = self.service.set_person_in_poll("id1", "john", membership, False)
+        result = self.service.set_person_in_poll("id1", "john", membership, False, "1")
 
         self.repo.remove_person_from_poll.assert_called_once_with(
             "id1", "john", "db_field"
@@ -112,7 +115,7 @@ class PollServiceTest(unittest.TestCase):
         membership = MagicMock()
 
         with self.assertRaises(PollNotFoundError):
-            self.service.set_person_in_poll(test_id, "john", membership, True)
+            self.service.set_person_in_poll(test_id, "john", membership, True, "1")
 
     def test_save_next_polls(self):
         base_poll = EventPoll(

@@ -1,96 +1,55 @@
-"""Abstraction to store banned personnel in the database.
-Note that this isn't currently used."""
+"""Repository for managing ban records."""
 
-from pymongo import UpdateOne
-from pymongo.collection import Collection
+import redis
 
-from src.model import AttendanceList
-from src.util import (
-    ABSENT_POINTS,
-    BAN_DURATION_SESSIONS,
-    BAN_THRESHOLD,
-    LAST_MINUTE_CANCELLATION_POINTS,
-)
+from src.util import ServiceUnavailableError
 
 
 class BanRepository:
-    """Repository for managing banned personnel storage."""
 
-    def __init__(self, collection: Collection):
-        self.collection = collection
+    def __init__(self, redis_url: str):
+        self.redis_client = redis.Redis.from_url(redis_url)
 
-    def log_bans(self, attendance_list: AttendanceList):
-        """Log bans for absent and last-minute cancelled personnel."""
-        absent_persons, cancelled_persons = (
-            attendance_list.get_non_present_penalisable_names()
-        )
-        all_persons = absent_persons + cancelled_persons
-        existing_records = {
-            doc["username"]: doc
-            for doc in self.collection.find({"username": {"$in": all_persons}})
-        }
+    def _get_key(self, user_id: str, banner_id: str) -> str:
+        """Generates a Redis key for the given user ID."""
+        return f"ban:{user_id}:by:{banner_id}"
 
-        bulk_operations = []
-        for person in absent_persons:
-            current_record = existing_records.get(
-                person, {"ban_points": 0, "ban_sessions": 0}
+    def ban_users(
+        self, user_ids: list, issuer_user_id: str, duration_seconds: int
+    ) -> None:
+        """Bans multiple users for a specified duration."""
+        for user_id in user_ids:
+            self.redis_client.setex(
+                self._get_key(user_id, issuer_user_id),
+                duration_seconds,
+                "banned",
             )
-            new_points = current_record["ban_points"] + ABSENT_POINTS
-            if new_points >= BAN_THRESHOLD:
-                new_points = new_points - BAN_THRESHOLD
-                new_sessions = current_record["ban_sessions"] + BAN_DURATION_SESSIONS
-            else:
-                new_sessions = current_record["ban_sessions"]
 
-            bulk_operations.append(
-                UpdateOne(
-                    {"username": person},
-                    {"$set": {"ban_points": new_points, "ban_sessions": new_sessions}},
-                    upsert=True,
-                )
-            )
-        for person in cancelled_persons:
-            current_record = existing_records.get(
-                person, {"ban_points": 0, "ban_sessions": 0}
-            )
-            new_points = current_record["ban_points"] + LAST_MINUTE_CANCELLATION_POINTS
-            if new_points >= BAN_THRESHOLD:
-                new_points = new_points - BAN_THRESHOLD
-                new_sessions = current_record["ban_sessions"] + BAN_DURATION_SESSIONS
-            else:
-                new_sessions = current_record["ban_sessions"]
+    def get_banned_users(self, issuer_user_id: str) -> list:
+        """Gets a list of all currently banned users by the issuer."""
+        pattern = self._get_key("*", issuer_user_id)
+        keys = self.redis_client.keys(pattern)
+        banned_users = [key.decode().split(":")[1] for key in keys]
+        return banned_users
 
-            bulk_operations.append(
-                UpdateOne(
-                    {"username": person},
-                    {"$set": {"ban_points": new_points, "ban_sessions": new_sessions}},
-                    upsert=True,
-                )
-            )
-        if bulk_operations:
-            self.collection.bulk_write(bulk_operations)
+    def unban_user(self, user_id: str, issuer_user_id: str) -> None:
+        """Unbans a user."""
+        self.redis_client.delete(self._get_key(user_id, issuer_user_id))
 
-    def get_and_update_banned_personnel(self, attendance_list: AttendanceList):
-        """Retrieve and update banned personnel based on their ban sessions."""
-        all_persons = attendance_list.get_all_player_names()
-        banned_persons = []
-        existing_records = {
-            doc["username"]: doc
-            for doc in self.collection.find({"username": {"$in": all_persons}})
-        }
-        bulk_operations = []
-        for person in all_persons:
-            current_record = existing_records.get(
-                person, {"ban_points": 0, "ban_sessions": 0}
+    def get_ban_duration(self, user_id: str, issuer_user_id: str) -> bool:
+        """Gets the ban duration for a user. Returns the remaining ban time in seconds
+        or 0 if not banned."""
+        value = self.redis_client.ttl(self._get_key(user_id, issuer_user_id))
+        return max(0, value)
+
+    def is_user_banned(self, username: str, issuer_user_id: str) -> bool:
+        """Checks if a user is currently banned by the issuer."""
+        try:
+            return (
+                self.redis_client.exists(self._get_key(username, issuer_user_id))
+                and self.get_ban_duration(username, issuer_user_id) > 0
             )
-            if current_record["ban_sessions"] > 0:
-                banned_persons.append(person)
-                new_sessions = current_record["ban_sessions"] - 1
-                bulk_operations.append(
-                    UpdateOne(
-                        {"username": person}, {"$set": {"ban_sessions": new_sessions}}
-                    )
-                )
-        if bulk_operations:
-            self.collection.bulk_write(bulk_operations)
-        return banned_persons
+        except redis.exceptions.ResponseError as e:
+            raise ServiceUnavailableError(
+                issuer_user_id, self.__class__.__name__
+            ) from e
