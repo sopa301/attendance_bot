@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "python": "3.13",
   "builds": [
     {
       "src": "src/api/app.py",
