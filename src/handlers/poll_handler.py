@@ -9,7 +9,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import ConversationHandler
 
-from src.service import PollGroupService, PollService
+from src.service import PollGroupService, PollService, TelegramMessageUpdater
 from src.util import (
     POLL_GROUP_MANAGEMENT_TEXT,
     CustomContext,
@@ -65,9 +65,15 @@ from src.view import (
 class PollHandler:
     """Handler class for poll-group-related commands and callbacks."""
 
-    def __init__(self, poll_service: PollService, poll_group_service: PollGroupService):
+    def __init__(
+        self,
+        poll_service: PollService,
+        poll_group_service: PollGroupService,
+        telegram_message_updater: TelegramMessageUpdater,
+    ):
         self.poll_service = poll_service
         self.poll_group_service = poll_group_service
+        self.telegram_message_updater = telegram_message_updater
         self.logger = logging.getLogger(__name__)
 
     async def get_polls(self, update: Update, _: CustomContext) -> int:
@@ -279,17 +285,13 @@ class PollHandler:
         poll_group, polls = self.poll_group_service.get_full_poll_group_details(
             poll.poll_group_id
         )
-        try:
-            await context.bot.edit_message_text(
-                text=generate_poll_group_text(poll_group, polls, membership),
-                inline_message_id=update.callback_query.inline_message_id,
-                reply_markup=InlineKeyboardMarkup(
-                    build_voting_buttons(polls, membership, pollmaker_id)
-                ),
-                parse_mode=ParseMode.MARKDOWN_V2,
-            )
-        except BadRequest:
-            pass  # nothing changes
+
+        await self.telegram_message_updater.update_inline_message(
+            update.callback_query.inline_message_id,
+            generate_poll_group_text(poll_group, polls, membership),
+            InlineKeyboardMarkup(build_voting_buttons(polls, membership, pollmaker_id)),
+            ParseMode.MARKDOWN_V2,
+        )
 
     async def handle_generate_next_poll_callback(
         self, update: Update, context: CustomContext

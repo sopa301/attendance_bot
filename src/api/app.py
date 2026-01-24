@@ -2,8 +2,10 @@
 
 import logging
 
+import redis
 from flask import Flask, request
 from pymongo import MongoClient
+from qstash import QStash
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -17,6 +19,7 @@ from telegram.ext import (
     filters,
 )
 
+from src.api.debounce_worker import bp as debounce_worker_bp
 from src.handlers import AttendanceHandler, BanHandler, GeneralHandler, PollHandler
 from src.repositories import (
     AttendanceRepository,
@@ -24,7 +27,13 @@ from src.repositories import (
     PollGroupRepository,
     PollRepository,
 )
-from src.service import AttendanceService, BanService, PollGroupService, PollService
+from src.service import (
+    AttendanceService,
+    BanService,
+    PollGroupService,
+    PollService,
+    TelegramMessageUpdater,
+)
 from src.util import (
     DELETE_POLL_REGEX_STRING,
     DO_NOTHING_REGEX_STRING,
@@ -55,6 +64,7 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 app = Flask(__name__)
+app.register_blueprint(debounce_worker_bp)
 
 # import env variables
 env_variables = [
@@ -68,6 +78,7 @@ env_variables = [
     "MONGO_ATTENANCES_COLLECTION_NAME",
     "MONGO_BANS_COLLECTION_NAME",
     "REDIS_URL",
+    "QSTASH_TOKEN",
 ]
 env_config = import_env(env_variables)
 
@@ -93,16 +104,20 @@ application = (
     .context_types(context_types)
     .build()
 )
+bot = application.bot
 
 # Instantiate services
+redis_client = redis.from_url(env_config["REDIS_URL"], decode_responses=True)
+qstash_client = QStash(env_config["QSTASH_TOKEN"])
+
 ban_service = BanService(ban_repository)
 poll_service = PollService(poll_repository, ban_service)
 poll_group_service = PollGroupService(poll_group_repository, poll_service)
 attendance_service = AttendanceService(attendance_repository, poll_service, ban_service)
-
+telegram_message_updater = TelegramMessageUpdater(redis_client, bot, qstash_client)
 
 # Instantiate internal handlers
-poll_handler = PollHandler(poll_service, poll_group_service)
+poll_handler = PollHandler(poll_service, poll_group_service, telegram_message_updater)
 attendance_handler = AttendanceHandler(
     attendance_service, poll_group_service, poll_service, ban_service
 )

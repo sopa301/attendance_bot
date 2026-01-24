@@ -20,5 +20,4 @@ def import_env(variables: list):
     all_present = all(var in os.environ for var in variables)
     if all_present:
         return {var: os.environ[var] for var in variables}
-    else:
-        return dotenv_values(".env")
+    return dotenv_values(".env")
