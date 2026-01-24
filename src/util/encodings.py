@@ -129,7 +129,7 @@ def encode_poll_voting(
     return f"v_{membership.value}_{poll_id}_{1 if is_sign_up else 0}_{pollmaker_id}"  # 1 for True, 0 for False
 
 
-def decode_poll_voting_callback(query: str) -> tuple:
+def decode_poll_voting_callback(query: str) -> tuple[str, Membership, bool, str | None]:
     """Decode poll ID, membership, sign-up status and pollmaker ID from poll voting callback."""
     results = query.split("_")[1:]
     if len(results) == 3:

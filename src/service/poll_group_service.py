@@ -76,7 +76,7 @@ class PollGroupService:
 
     def get_full_poll_group_details(
         self, group_id: str
-    ) -> Tuple[PollGroup | None, List[EventPoll]]:
+    ) -> Tuple[PollGroup, List[EventPoll]]:
         """Gets full details of a poll group by its ID."""
         poll_group = self._poll_group_repository.get_poll_group(group_id)
         polls = self._poll_service.get_event_polls(poll_group.get_poll_ids())

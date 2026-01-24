@@ -7,6 +7,8 @@ import os
 from qstash import QStash
 from telegram.error import BadRequest
 
+from src.util import Membership
+
 DEFAULT_WAIT_TIME_MS = 2000
 
 current_url = os.getenv("DEPLOYMENT_URL", "http://localhost:8000")
@@ -26,19 +28,27 @@ class TelegramMessageUpdater:
         """Gets the debouncer key name for Redis storage."""
         return f"debounce:{key}"
 
-    async def update_inline_message(
-        self, inline_message_id: str, text: str, reply_markup=None, parse_mode=None
+    async def update_polls_message(
+        self,
+        inline_message_id: str,
+        text: str,
+        reply_markup,
+        parse_mode,
+        poll_group_id: str,
+        membership: Membership,
     ):
         """Update a Telegram message with debouncing."""
 
         debounce_key = self.key_name(inline_message_id)
 
-        reply_markup_dict = reply_markup.to_dict() if reply_markup else None
+        reply_markup_dict = reply_markup.to_dict()
         payload = {
             "text": text,
             "reply_markup": reply_markup_dict,
             "parse_mode": parse_mode,
             "inline_message_id": inline_message_id,
+            "poll_group_id": str(poll_group_id),
+            "membership": membership.value,
         }
 
         json_payload = json.dumps(payload)
@@ -62,7 +72,12 @@ class TelegramMessageUpdater:
 
         # 3. Send first update immediately
         try:
-            await self.bot.edit_message_text(**payload)
+            await self.bot.edit_message_text(
+                text=text,
+                inline_message_id=inline_message_id,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
         except BadRequest as e:
             self.logger.warning("Initial edit failed: %s", e)
             # You may want to delete the key here if this fails

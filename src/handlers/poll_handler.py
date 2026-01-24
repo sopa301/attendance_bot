@@ -246,7 +246,7 @@ class PollHandler:
         await update.inline_query.answer(build_publish_options(poll_group, polls))
 
     async def handle_poll_voting_callback(
-        self, update: Update, context: CustomContext
+        self, update: Update, _: CustomContext
     ) -> None:
         """Handles the callback when a user votes in a poll."""
         user = update.callback_query.from_user
@@ -286,11 +286,13 @@ class PollHandler:
             poll.poll_group_id
         )
 
-        await self.telegram_message_updater.update_inline_message(
+        await self.telegram_message_updater.update_polls_message(
             update.callback_query.inline_message_id,
             generate_poll_group_text(poll_group, polls, membership),
             InlineKeyboardMarkup(build_voting_buttons(polls, membership, pollmaker_id)),
             ParseMode.MARKDOWN_V2,
+            poll.poll_group_id,
+            membership,
         )
 
     async def handle_generate_next_poll_callback(

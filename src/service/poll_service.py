@@ -80,9 +80,9 @@ class PollService:
         membership: Membership,
         is_sign_up: bool,
         pollmaker_id: str,
-    ) -> EventPoll | None:
+    ) -> EventPoll:
         """
-        Sets a person's sign-up status in a poll. Returns the poll if successful, None otherwise.
+        Sets a person's sign-up status in a poll. Returns the poll.
         """
         self.validate_username_for_poll(username, pollmaker_id)
         self.logger.info(
