@@ -14,7 +14,7 @@ src_paths = ["src"]
 [project]
 name = "PickleBot"
 version = "0.1.0"
-requires-python = ">=3.13"
+requires-python = "==3.13.7"
 description = "Some description"
 authors = [{ name = "Ryan" }]
 dependencies = [
