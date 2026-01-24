@@ -103,11 +103,11 @@ async def update_message_with_poll_group_details(json_body, receiver_bot: Bot):
     """Given the serialized state, update the inline message."""
     logger.info("Updating inline message with state: %s", json_body)
     dct = json.loads(json_body)
-    poll_group_id = dct["poll_group_id"]
+    poll_group_id = ObjectId(dct["poll_group_id"])
     message_id = dct["inline_message_id"]
     poll_group, polls = poll_group_service.get_full_poll_group_details(poll_group_id)
     membership = Membership.from_data_string(dct["membership"])
-    pollmaker_id = ObjectId(str(poll_group.owner_id))
+    pollmaker_id = poll_group.owner_id
 
     try:
         await receiver_bot.edit_message_text(
