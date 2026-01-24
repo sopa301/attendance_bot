@@ -4,7 +4,6 @@ import logging
 
 import redis
 from flask import Flask, request
-from pymongo import MongoClient
 from qstash import QStash
 from telegram import Update
 from telegram.ext import (
@@ -21,12 +20,7 @@ from telegram.ext import (
 
 from src.api.debounce_worker import bp as debounce_worker_bp
 from src.handlers import AttendanceHandler, BanHandler, GeneralHandler, PollHandler
-from src.repositories import (
-    AttendanceRepository,
-    BanRepository,
-    PollGroupRepository,
-    PollRepository,
-)
+from src.repositories import attendance_repo, ban_repo, poll_group_repo, poll_repo
 from src.service import (
     AttendanceService,
     BanService,
@@ -82,19 +76,6 @@ env_variables = [
 ]
 env_config = import_env(env_variables)
 
-# connect to db
-client = MongoClient(env_config["MONGO_URL"])
-db = client[env_config["MONGO_DB_NAME"]]
-polls_collection = db[env_config["MONGO_POLLS_COLLECTION_NAME"]]
-groups_collection = db[env_config["MONGO_GROUPS_COLLECTION_NAME"]]
-attendance_collection = db[env_config["MONGO_ATTENANCES_COLLECTION_NAME"]]
-
-
-poll_repository = PollRepository(polls_collection)
-poll_group_repository = PollGroupRepository(groups_collection)
-attendance_repository = AttendanceRepository(attendance_collection)
-ban_repository = BanRepository(env_config["REDIS_URL"])
-
 # Define configuration constants
 admin_chat_id = int(env_config["DEVELOPER_CHAT_ID"])
 context_types = ContextTypes(context=CustomContext)
@@ -110,10 +91,10 @@ bot = application.bot
 redis_client = redis.from_url(env_config["REDIS_URL"], decode_responses=True)
 qstash_client = QStash(env_config["QSTASH_TOKEN"])
 
-ban_service = BanService(ban_repository)
-poll_service = PollService(poll_repository, ban_service)
-poll_group_service = PollGroupService(poll_group_repository, poll_service)
-attendance_service = AttendanceService(attendance_repository, poll_service, ban_service)
+ban_service = BanService(ban_repo)
+poll_service = PollService(poll_repo, ban_service)
+poll_group_service = PollGroupService(poll_group_repo, poll_service)
+attendance_service = AttendanceService(attendance_repo, poll_service, ban_service)
 telegram_message_updater = TelegramMessageUpdater(redis_client, bot, qstash_client)
 
 # Instantiate internal handlers

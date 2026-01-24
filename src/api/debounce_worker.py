@@ -1,12 +1,12 @@
 """Main application file for the Telegram bot."""
 
 import json
+import logging
 import os
 
 import redis
 from bson import ObjectId
 from flask import Blueprint, request
-from pymongo import MongoClient
 from qstash import QStash
 from qstash.receiver import Receiver
 from telegram import Bot, InlineKeyboardMarkup
@@ -14,7 +14,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.request import HTTPXRequest
 
-from src.repositories import BanRepository, PollGroupRepository, PollRepository
+from src.repositories import ban_repo, poll_group_repo, poll_repo
 from src.service import BanService, PollGroupService, PollService
 from src.util import Membership, import_env
 from src.view import build_voting_buttons, generate_poll_group_text
@@ -45,24 +45,15 @@ env_variables = [
 ]
 env_config = import_env(env_variables)
 
-# connect to db
-client = MongoClient(env_config["MONGO_URL"])
-db = client[env_config["MONGO_DB_NAME"]]
-polls_collection = db[env_config["MONGO_POLLS_COLLECTION_NAME"]]
-groups_collection = db[env_config["MONGO_GROUPS_COLLECTION_NAME"]]
-
-# instantiate repositories
-poll_repository = PollRepository(polls_collection)
-poll_group_repository = PollGroupRepository(groups_collection)
-ban_repository = BanRepository(env_config["REDIS_URL"])
-
 # Instantiate services
 redis_client = redis.from_url(env_config["REDIS_URL"], decode_responses=True)
 qstash_client = QStash(env_config["QSTASH_TOKEN"])
 
-ban_service = BanService(ban_repository)
-poll_service = PollService(poll_repository, ban_service)
-poll_group_service = PollGroupService(poll_group_repository, poll_service)
+ban_service = BanService(ban_repo)
+poll_service = PollService(poll_repo, ban_service)
+poll_group_service = PollGroupService(poll_group_repo, poll_service)
+
+logger = logging.getLogger(__name__)
 
 
 @bp.route("/qstash_debounced", methods=["POST"])
@@ -110,13 +101,14 @@ async def handler():
 
 async def update_message_with_poll_group_details(json_body, receiver_bot: Bot):
     """Given the serialized state, update the inline message."""
-    print("Updating inline message with state:", json_body)
+    logger.info("Updating inline message with state: %s", json_body)
     dct = json.loads(json_body)
     poll_group_id = dct["poll_group_id"]
     message_id = dct["inline_message_id"]
     poll_group, polls = poll_group_service.get_full_poll_group_details(poll_group_id)
     membership = Membership.from_data_string(dct["membership"])
-    pollmaker_id = ObjectId(poll_group.owner_id)
+    pollmaker_id = ObjectId(str(poll_group.owner_id))
+
     try:
         await receiver_bot.edit_message_text(
             inline_message_id=message_id,
@@ -127,4 +119,4 @@ async def update_message_with_poll_group_details(json_body, receiver_bot: Bot):
             parse_mode=ParseMode.MARKDOWN_V2,
         )
     except BadRequest as e:
-        print("Failed to edit message:", e)
+        logger.error("Failed to edit message:", exc_info=e)
