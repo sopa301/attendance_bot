@@ -5,11 +5,12 @@ import logging
 import os
 
 from qstash import QStash
+from telegram import Bot
 from telegram.error import BadRequest
 
 from src.util import Membership
 
-DEFAULT_WAIT_TIME_MS = 2000
+DEFAULT_WAIT_TIME_MS = 2500
 
 current_url = os.getenv("DEPLOYMENT_URL", "http://localhost:8000")
 
@@ -17,7 +18,7 @@ current_url = os.getenv("DEPLOYMENT_URL", "http://localhost:8000")
 class TelegramMessageUpdater:
     """Service for updating Telegram messages with debouncing."""
 
-    def __init__(self, redis_client, bot, qstash_client: QStash):
+    def __init__(self, redis_client, bot: Bot, qstash_client: QStash):
         self.redis_client = redis_client
         self.bot = bot
         self.qstash_client = qstash_client
@@ -41,11 +42,7 @@ class TelegramMessageUpdater:
 
         debounce_key = self.key_name(inline_message_id)
 
-        reply_markup_dict = reply_markup.to_dict()
         payload = {
-            "text": text,
-            "reply_markup": reply_markup_dict,
-            "parse_mode": parse_mode,
             "inline_message_id": inline_message_id,
             "poll_group_id": str(poll_group_id),
             "membership": membership.value,

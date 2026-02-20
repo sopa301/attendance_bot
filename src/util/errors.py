@@ -41,10 +41,11 @@ class UserBannedError(Exception):
     Exception raised when a user is banned from performing an action.
     """
 
-    def __init__(self, username, banned_duration: int):
+    def __init__(self, username, banned_duration: int, reason: str):
         self.username = username
         self.message = "User is banned with username: " + username
         self.banned_duration = banned_duration
+        self.reason = reason
         super().__init__(self.message)
 
 

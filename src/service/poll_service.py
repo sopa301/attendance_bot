@@ -70,7 +70,9 @@ class PollService:
             return
         self.logger.info("User %s is banned from voting by %s", username, pollmaker_id)
         raise UserBannedError(
-            username, self.ban_service.get_ban_duration(username, pollmaker_id)
+            username,
+            self.ban_service.get_ban_duration(username, pollmaker_id),
+            self.ban_service.repository.get_ban_message(username, pollmaker_id),
         )
 
     def set_person_in_poll(

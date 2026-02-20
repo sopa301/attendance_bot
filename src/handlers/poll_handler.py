@@ -273,11 +273,14 @@ class PollHandler:
             return
         except UserBannedError as e:
             await update.callback_query.answer(
-                text=build_user_banned_message(e.banned_duration), show_alert=True
+                text=build_user_banned_message(e.banned_duration, e.reason),
+                show_alert=True,
             )
             return
         await update.callback_query.answer(
-            text=build_poll_vote_confirmation_message(poll.get_title(), is_sign_up),
+            text=build_poll_vote_confirmation_message(
+                poll.get_title(), is_sign_up, membership
+            ),
             show_alert=True,
         )
 

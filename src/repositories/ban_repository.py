@@ -4,6 +4,10 @@ import redis
 
 from src.util import ServiceUnavailableError
 
+OLD_BANNED_MESSAGE = "banned"  # This is the old value stored in Redis for banned users.
+# We keep it for backward compatibility, but we can remove it
+# in the future when we are sure all old bans have expired.
+
 
 class BanRepository:
 
@@ -15,14 +19,18 @@ class BanRepository:
         return f"ban:{user_id}:by:{banner_id}"
 
     def ban_users(
-        self, user_ids: list, issuer_user_id: str, duration_seconds: int
+        self,
+        user_ids: list,
+        issuer_user_id: str,
+        duration_seconds: int,
+        ban_message: str,
     ) -> None:
         """Bans multiple users for a specified duration."""
         for user_id in user_ids:
             self.redis_client.setex(
                 self._get_key(user_id, issuer_user_id),
                 duration_seconds,
-                "banned",
+                ban_message,
             )
 
     def get_banned_users(self, issuer_user_id: str) -> list:
@@ -53,3 +61,10 @@ class BanRepository:
             raise ServiceUnavailableError(
                 issuer_user_id, self.__class__.__name__
             ) from e
+
+    def get_ban_message(self, user_id: str, issuer_user_id: str) -> str:
+        """Gets the ban message for a user."""
+        value = self.redis_client.get(self._get_key(user_id, issuer_user_id))
+        if value == OLD_BANNED_MESSAGE.encode() or value is None:
+            return "For being absent for a previous session."
+        return value.decode()

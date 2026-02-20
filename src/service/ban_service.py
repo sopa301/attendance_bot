@@ -15,9 +15,12 @@ class BanService:
     def log_bans(self, attendance_list: AttendanceList, issuer_user_id: str) -> None:
         """Logs bans for the given attendance list."""
         usernames_to_ban = attendance_list.get_penalisable_names()
+        ban_message = "Absent from session with details: \n" + "\n".join(
+            attendance_list.details
+        )
         print(f"Banning users: {usernames_to_ban} with issuer ID: {issuer_user_id}")
         self.repository.ban_users(
-            usernames_to_ban, issuer_user_id, DEFAULT_BAN_DURATION_SECONDS
+            usernames_to_ban, issuer_user_id, DEFAULT_BAN_DURATION_SECONDS, ban_message
         )
 
     def get_banned_users(self, issuer_user_id: str) -> list:
@@ -25,10 +28,12 @@ class BanService:
         return self.repository.get_banned_users(issuer_user_id)
 
     def ban_user(
-        self, user_id: str, issuer_user_id: str, duration_seconds: int
+        self, user_id: str, issuer_user_id: str, duration_seconds: int, ban_message: str
     ) -> None:
         """Bans a user for a specified duration."""
-        self.repository.ban_users([user_id], issuer_user_id, duration_seconds)
+        self.repository.ban_users(
+            [user_id], issuer_user_id, duration_seconds, ban_message
+        )
 
     def get_ban_duration(self, user_id: str, issuer_user_id: str) -> bool:
         """Gets the ban duration for a user. Returns the remaining ban time in seconds

@@ -235,7 +235,7 @@ def build_poll_unable_to_vote_message() -> str:
     return "Poll has been closed or does not exist."
 
 
-def build_user_banned_message(duration: int) -> str:
+def build_user_banned_message(duration: int, reason: str) -> str:
     """Builds the bot message when a user is banned."""
     units = [
         ("day", 86400),
@@ -254,13 +254,22 @@ def build_user_banned_message(duration: int) -> str:
     if not parts:
         return "You are banned from voting."
 
-    return f"You are banned from voting for {', '.join(parts)}."
+    return f"Banned for {', '.join(parts)}" f"\n{reason}"
 
 
-def build_poll_vote_confirmation_message(poll_title: str, is_sign_up: bool) -> str:
+def build_poll_vote_confirmation_message(
+    poll_title: str, is_sign_up: bool, membership: Membership
+) -> str:
     """Builds the bot message confirming a vote in a poll."""
     action = "signed up for" if is_sign_up else "dropped out of"
-    return f"You have successfully {action} the poll: {poll_title}."
+    message = f"Successfully {action}: {poll_title}."
+    if not is_sign_up or membership == Membership.REGULAR:
+        return message
+    message += (
+        " Please opt out by 10 pm the night before if you cannot attend,"
+        " or you may be barred from future polls."
+    )
+    return message
 
 
 # To be used with Markdownv2
