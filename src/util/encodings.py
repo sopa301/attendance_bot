@@ -231,4 +231,4 @@ def encode_unban_user(user_id: str) -> str:
 
 def decode_unban_user(encoded: str) -> str:
     """Decode user ID from unbanning a user."""
-    return encoded.split("_")[1]
+    return "".join(encoded.split("_")[1:])
